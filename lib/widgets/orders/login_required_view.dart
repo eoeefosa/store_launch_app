@@ -33,7 +33,7 @@ class LoginRequiredView extends StatelessWidget {
             ).animate().scale(duration: 600.ms, curve: Curves.elasticOut),
             const SizedBox(height: 40),
             const Text(
-              'Join LaunchFast',
+              'Join Store Launchfast',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 26,

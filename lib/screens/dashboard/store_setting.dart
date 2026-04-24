@@ -372,7 +372,7 @@ class _SettingsBody extends StatelessWidget {
           const SizedBox(height: 40),
           Center(
             child: Text(
-              'LaunchFast v1.0.0',
+              'Store Launchfast v1.0.0',
               style: TextStyle(color: theme.muted, fontSize: 12),
             ),
           ),

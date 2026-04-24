@@ -1,6 +1,6 @@
 {
-    "name": "launchfast",
-    "short_name": "launchfast",
+    "name": "store_launchfast",
+    "short_name": "store_launchfast",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

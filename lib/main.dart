@@ -31,7 +31,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp.router(
-      title: 'Launch Fast',
+      title: 'store_launchfast',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         useMaterial3: true,

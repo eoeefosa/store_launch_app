@@ -5,14 +5,14 @@ import 'package:go_router/go_router.dart';
 import 'package:store_launchfast/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 
-class LaunchFastSplashScreen extends StatefulWidget {
-  const LaunchFastSplashScreen({super.key});
+class StoreLaunchfastSplashScreen extends StatefulWidget {
+  const StoreLaunchfastSplashScreen({super.key});
 
   @override
-  State<LaunchFastSplashScreen> createState() => _LaunchFastSplashScreenState();
+  State<StoreLaunchfastSplashScreen> createState() => _StoreLaunchfastSplashScreenState();
 }
 
-class _LaunchFastSplashScreenState extends State<LaunchFastSplashScreen> {
+class _StoreLaunchfastSplashScreenState extends State<StoreLaunchfastSplashScreen> {
   @override
   void initState() {
     super.initState();

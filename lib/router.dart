@@ -4,7 +4,6 @@ import 'package:store_launchfast/screens/auth/login_screen.dart';
 import 'package:store_launchfast/screens/auth/register_screen.dart';
 import 'package:store_launchfast/screens/dashboard/store_main_nav.dart';
 import 'package:store_launchfast/screens/dashboard/worker_main_nav.dart';
-import 'package:store_launchfast/screens/tabs/profile_screen.dart';
 import 'package:store_launchfast/splash_screen.dart';
 
 final router = GoRouter(
@@ -30,10 +29,6 @@ final router = GoRouter(
     GoRoute(
       path: '/worker',
       builder: (context, state) => const WorkerMainNav(),
-    ),
-    GoRoute(
-      path: '/profile',
-      builder: (context, state) => const ProfileScreen(),
     ),
   ],
 );

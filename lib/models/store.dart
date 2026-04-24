@@ -11,6 +11,7 @@ class Store {
   final double deliveryFee;
   final String image;
   final String? ownerId;
+  final bool isApproved;
 
   Store({
     required this.id,
@@ -25,6 +26,7 @@ class Store {
     required this.deliveryFee,
     required this.image,
     this.ownerId,
+    this.isApproved = true, // Default to true for backward compatibility with static data
   });
 
   factory Store.fromJson(Map<String, dynamic> json) {
@@ -41,6 +43,7 @@ class Store {
       deliveryFee: (json['deliveryFee'] as num).toDouble(),
       image: json['image'],
       ownerId: json['ownerId'],
+      isApproved: json['isApproved'] ?? false,
     );
   }
 
@@ -58,6 +61,7 @@ class Store {
       'deliveryFee': deliveryFee,
       'image': image,
       'ownerId': ownerId,
+      'isApproved': isApproved,
     };
   }
 
@@ -74,6 +78,7 @@ class Store {
     double? deliveryFee,
     String? image,
     String? ownerId,
+    bool? isApproved,
   }) {
     return Store(
       id: id ?? this.id,
@@ -88,6 +93,7 @@ class Store {
       deliveryFee: deliveryFee ?? this.deliveryFee,
       image: image ?? this.image,
       ownerId: ownerId ?? this.ownerId,
+      isApproved: isApproved ?? this.isApproved,
     );
   }
 }

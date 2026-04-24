@@ -112,6 +112,28 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<void> applyForStore(Map<String, dynamic> applyData) async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      final data = await authRepository.applyForStore(applyData);
+      final uData = data['user'] ?? data;
+      if (uData is Map && uData['id'] != null) {
+        _user = UserProfile.fromJson(uData as Map<String, dynamic>);
+
+        // Persist the updated user profile (new role)
+        await storage.write(
+          key: 'launch-fast-user',
+          value: jsonEncode(_user!.toJson()),
+        );
+        notifyListeners();
+      }
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> signInWithGoogle() async {
     _isLoading = true;
     notifyListeners();

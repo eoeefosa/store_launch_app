@@ -127,14 +127,58 @@ class _StoreMainNavState extends State<StoreMainNav>
     ];
 
     return Scaffold(
-      body: AnimatedSwitcher(
-        duration: const Duration(milliseconds: 220),
-        switchInCurve: Curves.easeOut,
-        switchOutCurve: Curves.easeIn,
-        child: KeyedSubtree(
-          key: ValueKey(_currentIndex),
-          child: pages[_currentIndex],
-        ),
+      body: Consumer2<AuthProvider, StoreProvider>(
+        builder: (context, auth, storeProvider, child) {
+          final userId = auth.user?.id;
+          final ownedStore = storeProvider.stores.firstWhere(
+            (s) => s.ownerId == userId,
+            orElse: () => storeProvider.stores.first,
+          );
+
+          if (!ownedStore.isApproved) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(32.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.pending_actions, size: 80, color: Colors.orange),
+                    const SizedBox(height: 24),
+                    const Text(
+                      'Approval Pending',
+                      style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Your store "${ownedStore.name}" is currently being reviewed by our administrators. You will be notified once it is approved.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 16, color: Colors.grey[600]),
+                    ),
+                    const SizedBox(height: 32),
+                    ElevatedButton(
+                      onPressed: () => storeProvider.refreshData(),
+                      child: const Text('Check Status'),
+                    ),
+                    TextButton(
+                      onPressed: () => auth.logout(),
+                      child: const Text('Logout'),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          return AnimatedSwitcher(
+            duration: const Duration(milliseconds: 220),
+            switchInCurve: Curves.easeOut,
+            switchOutCurve: Curves.easeIn,
+            child: KeyedSubtree(
+              key: ValueKey(_currentIndex),
+              child: pages[_currentIndex],
+            ),
+          );
+        },
       ),
       bottomNavigationBar: Container(
         decoration: BoxDecoration(

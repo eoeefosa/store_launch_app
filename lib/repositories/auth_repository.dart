@@ -25,6 +25,11 @@ class AuthRepository {
     final response = await apiService.dio.patch('/auth/profile', data: updates);
     return response.data;
   }
+
+  Future<Map<String, dynamic>> applyForStore(Map<String, dynamic> data) async {
+    final response = await apiService.dio.post('/stores/apply', data: data);
+    return response.data;
+  }
 }
 
 final authRepository = AuthRepository();

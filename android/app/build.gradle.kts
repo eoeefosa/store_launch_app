@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.launchfast.app"
+    namespace = "com.storelaunchfast.app"
     compileSdk = flutter.compileSdkVersion
     ndkVersion = flutter.ndkVersion
     buildToolsVersion = "36.1.0"
@@ -22,7 +22,8 @@ android {
 
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.launchfast.app"
+        applicationId = "com.storelaunchfast.app"
+
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion

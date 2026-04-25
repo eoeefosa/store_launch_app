@@ -1,4 +1,4 @@
-package com.launchfast.app
+package com.storelaunchfast.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -21,7 +21,11 @@ class _StoreLaunchfastSplashScreenState extends State<StoreLaunchfastSplashScree
         final auth = context.read<AuthProvider>();
         if (auth.isAuthenticated) {
           if (auth.isStoreOwner) {
-            context.go('/store');
+            if (auth.isStoreApproved) {
+              context.go('/store');
+            } else {
+              context.go('/awaiting-approval');
+            }
           } else if (auth.user?.role == 'STORE_WORKER') {
             context.go('/worker');
           } else {

@@ -7,6 +7,7 @@ import '../repositories/auth_repository.dart';
 import '../constants/static_data.dart';
 import '../services/api_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import '../services/ably_service.dart';
 import 'dart:io';
 
 class AuthProvider with ChangeNotifier {
@@ -26,6 +27,8 @@ class AuthProvider with ChangeNotifier {
   
   bool get isAdmin => _user?.role == 'admin';
   bool get isStoreOwner => _user?.role == 'store_owner';
+  bool get isStoreApproved => _user?.isStoreApproved ?? false;
+  bool get isPendingApproval => isStoreOwner && !isStoreApproved;
   bool get isRider => _user?.role == 'rider';
   bool get isAuthenticated => _token != null;
   Store? get adminStore => _adminStoreId != null
@@ -60,6 +63,10 @@ class AuthProvider with ChangeNotifier {
       if (adminId != null) {
         _adminStoreId = adminId;
       }
+      
+      if (_user != null) {
+        _setupAblyListeners();
+      }
     } catch (e) {
       // print('Failed to load auth data: $e');
     } finally {
@@ -83,6 +90,7 @@ class AuthProvider with ChangeNotifier {
           key: 'launch-fast-user',
           value: jsonEncode(_user!.toJson()),
         );
+        _setupAblyListeners();
       }
     } finally {
       _isLoading = false;
@@ -105,6 +113,7 @@ class AuthProvider with ChangeNotifier {
           key: 'launch-fast-user',
           value: jsonEncode(_user!.toJson()),
         );
+        _setupAblyListeners();
       }
     } finally {
       _isLoading = false;
@@ -116,6 +125,7 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
+      print(applyData);
       final data = await authRepository.applyForStore(applyData);
       final uData = data['user'] ?? data;
       if (uData is Map && uData['id'] != null) {
@@ -126,6 +136,7 @@ class AuthProvider with ChangeNotifier {
           key: 'launch-fast-user',
           value: jsonEncode(_user!.toJson()),
         );
+        _setupAblyListeners();
         notifyListeners();
       }
     } finally {
@@ -164,6 +175,7 @@ class AuthProvider with ChangeNotifier {
           key: 'launch-fast-user',
           value: jsonEncode(_user!.toJson()),
         );
+        _setupAblyListeners();
       }
     } catch (e) {
       // print('Google Sign-In Error: $e');
@@ -185,6 +197,7 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       // print('Google sign out error: $e');
     }
+    ablyService.disconnect();
     notifyListeners();
   }
 
@@ -237,6 +250,25 @@ class AuthProvider with ChangeNotifier {
     if (_user != null && _user!.role != newRole) {
       updateUser({'role': newRole});
     }
+  }
+
+  void updateStoreApproval(bool isApproved) {
+    if (_user != null && _user!.isStoreApproved != isApproved) {
+      updateUser({'isStoreApproved': isApproved});
+    }
+  }
+
+  void _setupAblyListeners() {
+    if (_user == null) return;
+    
+    // Ensure Ably is initialized for this user
+    ablyService.initAbly(_user!.id);
+    
+    // Add listeners (they won't be duplicated if already added in ablyService)
+    ablyService.addRoleListener(updateRole);
+    ablyService.addStoreApprovalListener((storeId) {
+      updateStoreApproval(true);
+    });
   }
 
   /// Fetches fresh user data from the backend and persists it.

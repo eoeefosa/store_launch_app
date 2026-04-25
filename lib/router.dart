@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 import 'package:store_launchfast/screens/auth/forgot_password_screen.dart';
 import 'package:store_launchfast/screens/auth/login_screen.dart';
 import 'package:store_launchfast/screens/auth/register_screen.dart';
+import 'package:store_launchfast/screens/auth/awaiting_approval_screen.dart';
 import 'package:store_launchfast/screens/dashboard/store_main_nav.dart';
 import 'package:store_launchfast/screens/dashboard/worker_main_nav.dart';
 import 'package:store_launchfast/splash_screen.dart';
@@ -29,6 +30,10 @@ final router = GoRouter(
     GoRoute(
       path: '/worker',
       builder: (context, state) => const WorkerMainNav(),
+    ),
+    GoRoute(
+      path: '/awaiting-approval',
+      builder: (context, state) => const AwaitingApprovalScreen(),
     ),
   ],
 );

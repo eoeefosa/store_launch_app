@@ -29,6 +29,9 @@ class AblyService {
   // Listener registry for role updates
   final List<Function(String newRole)> _roleListeners = [];
 
+  // Listener registry for store approval
+  final List<Function(String storeId)> _approvalListeners = [];
+
   // Listener registry for generic notifications
   final List<Function(Map<String, dynamic> payload)> _notificationListeners = [];
 
@@ -110,6 +113,19 @@ class AblyService {
         }
       } catch (e) {
         // print("Error processing role update message: $e");
+      }
+    });
+
+    // Subscribe to store-approved events on the user's personal channel
+    _userChannel!.subscribe(name: 'store-approved').listen((ably.Message message) {
+      try {
+        final data = message.data as Map;
+        final storeId = data['storeId'] as String;
+        for (final cb in _approvalListeners) {
+          cb(storeId);
+        }
+      } catch (e) {
+        // print("Error processing store approval message: $e");
       }
     });
 
@@ -248,6 +264,17 @@ class AblyService {
     _roleListeners.remove(listener);
   }
 
+  // Store approval listeners
+  void addStoreApprovalListener(Function(String storeId) listener) {
+    if (!_approvalListeners.contains(listener)) {
+      _approvalListeners.add(listener);
+    }
+  }
+
+  void removeStoreApprovalListener(Function(String storeId) listener) {
+    _approvalListeners.remove(listener);
+  }
+
   // Notification listeners
   void addNotificationListener(Function(Map<String, dynamic> payload) listener) {
     if (!_notificationListeners.contains(listener)) {
@@ -291,6 +318,7 @@ class AblyService {
     _orderListeners.clear();
     _storeListeners.clear();
     _roleListeners.clear();
+    _approvalListeners.clear();
     _isConnecting = false;
     // print('Ably disconnected and listeners cleared');
   }

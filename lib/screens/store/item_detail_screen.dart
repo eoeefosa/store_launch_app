@@ -128,9 +128,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
 
     final item = storeProvider.menuItems.firstWhere((m) => m.id == widget.id);
     final store = StaticData.stores.firstWhere((s) => s.id == item.storeId);
-    final accentColor = Color(
-      int.parse(store.accentColor.replaceFirst('#', '0xFF')),
-    );
+    final accentColor = store.color;
 
     final availableSoups = item.category == 'Swallow'
         ? storeProvider.menuItems

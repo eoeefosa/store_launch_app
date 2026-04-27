@@ -204,7 +204,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             const SizedBox(height: 16),
             _buildPaymentCard(
               icon: Icons.account_balance_wallet_rounded,
-              title: 'LanchFast Wallet',
+              title: 'LaunchFast Wallet',
               subtitle: 'Balance: ₦12,500',
               isActive: true,
             ),

@@ -76,17 +76,26 @@ class _CategoryGroup extends StatelessWidget {
     required this.index,
   });
 
+  /// Base duration for the entrance animation.
+  static const int _baseAnimationMs = 600;
+
+  /// Stagger interval per category index.
+  static const int _staggerIntervalMs = 100;
+
+  /// Vertical offset for the slide-up entrance.
+  static const double _slideOffset = 40.0;
+
   @override
   Widget build(BuildContext context) {
     return TweenAnimationBuilder<double>(
       tween: Tween(begin: 0.0, end: 1.0),
-      duration: Duration(milliseconds: 600 + (index * 100)),
+      duration: Duration(milliseconds: _baseAnimationMs + (index * _staggerIntervalMs)),
       curve: Curves.easeOutBack,
       builder: (context, value, child) {
         return Opacity(
           opacity: value.clamp(0.0, 1.0),
           child: Transform.translate(
-            offset: Offset(0, 40 * (1 - value)),
+            offset: Offset(0, _slideOffset * (1 - value)),
             child: child,
           ),
         );

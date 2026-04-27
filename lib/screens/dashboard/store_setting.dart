@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:store_launchfast/constants/app_colors.dart';
+import 'package:store_launchfast/models/staff_member.dart';
 import 'package:store_launchfast/providers/auth_provider.dart';
-import 'package:store_launchfast/services/api_service.dart';
+import 'package:store_launchfast/providers/staff_provider.dart';
+import 'package:store_launchfast/providers/store_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 
 class StoreSettingsScreen extends StatefulWidget {
   const StoreSettingsScreen({super.key});
@@ -20,15 +23,17 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
 
   // ─── State ────────────────────────────────────────────────────────────────
   String? _storeId;
-  List<dynamic> _workers = [];
   bool _isLoading = true;
   bool _isSaving = false;
-  bool _isLoadingStaff = false;
 
   @override
   void initState() {
     super.initState();
-    _loadStore().then((_) => _loadStaff());
+    _loadStore().then((_) {
+      if (_storeId != null && mounted) {
+        context.read<StaffProvider>().fetchStaff(_storeId!);
+      }
+    });
   }
 
   @override
@@ -45,36 +50,20 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
   Future<void> _loadStore() async {
     setState(() => _isLoading = true);
     try {
-      final userId = context.read<AuthProvider>().user?.id;
-      final res = await apiService.dio.get('/stores');
-      final List stores = res.data ?? [];
-      if (stores.isEmpty) return;
+      final storeProvider = context.read<StoreProvider>();
+      final store = storeProvider.ownedStore;
+      if (store == null) return;
 
-      final store = stores.firstWhere(
-        (s) => s['ownerId'] == userId,
-        orElse: () => stores.first,
-      );
-
-      _storeId = store['id']?.toString();
-      _nameCtrl.text = store['name']?.toString() ?? '';
-      _taglineCtrl.text = store['tagline']?.toString() ?? '';
-      _deliveryTimeCtrl.text = store['deliveryTime']?.toString() ?? '';
-      _deliveryFeeCtrl.text = store['deliveryFee']?.toString() ?? '';
-    } catch (_) {
+      _storeId = store.id;
+      _nameCtrl.text = store.name;
+      _taglineCtrl.text = store.tagline;
+      _deliveryTimeCtrl.text = store.deliveryTime;
+      _deliveryFeeCtrl.text = store.deliveryFee.toString();
+    } catch (e) {
+      debugPrint('[StoreSettings] _loadStore error: $e');
+      _showSnackBar('Failed to load store settings', success: false);
     } finally {
       if (mounted) setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _loadStaff() async {
-    if (_storeId == null) return;
-    setState(() => _isLoadingStaff = true);
-    try {
-      final res = await apiService.dio.get('/stores/$_storeId/staff');
-      if (mounted) setState(() => _workers = res.data ?? []);
-    } catch (_) {
-    } finally {
-      if (mounted) setState(() => _isLoadingStaff = false);
     }
   }
 
@@ -82,17 +71,16 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
     if (_storeId == null) return;
     setState(() => _isSaving = true);
     try {
-      await apiService.dio.put(
-        '/stores/$_storeId',
-        data: {
-          'name': _nameCtrl.text.trim(),
-          'tagline': _taglineCtrl.text.trim(),
-          'deliveryTime': _deliveryTimeCtrl.text.trim(),
-          'deliveryFee': double.tryParse(_deliveryFeeCtrl.text.trim()) ?? 0,
-        },
-      );
+      final storeProvider = context.read<StoreProvider>();
+      await storeProvider.updateStore({
+        'name': _nameCtrl.text.trim(),
+        'tagline': _taglineCtrl.text.trim(),
+        'deliveryTime': _deliveryTimeCtrl.text.trim(),
+        'deliveryFee': double.tryParse(_deliveryFeeCtrl.text.trim()) ?? 0,
+      });
       _showSnackBar('Store updated successfully', success: true);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[StoreSettings] _saveStore error: $e');
       _showSnackBar('Failed to save store settings', success: false);
     } finally {
       if (mounted) setState(() => _isSaving = false);
@@ -102,26 +90,20 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
   Future<void> _addStaff(String email) async {
     if (_storeId == null) return;
     try {
-      await apiService.dio.post(
-        '/stores/$_storeId/staff',
-        data: {'email': email},
-      );
-      _loadStaff();
+      await context.read<StaffProvider>().addStaff(_storeId!, email);
       _showSnackBar('Staff added successfully', success: true);
-    } catch (_) {
-      _showSnackBar(
-        'Failed to add staff. Ensure the user exists.',
-        success: false,
-      );
+    } catch (e) {
+      _showSnackBar(e.toString().replaceAll('Exception: ', ''), success: false);
     }
   }
 
   Future<void> _removeStaff(String workerId) async {
     if (_storeId == null) return;
     try {
-      await apiService.dio.delete('/stores/$_storeId/staff/$workerId');
-      _loadStaff();
-    } catch (_) {}
+      await context.read<StaffProvider>().removeStaff(_storeId!, workerId);
+    } catch (e) {
+      _showSnackBar(e.toString().replaceAll('Exception: ', ''), success: false);
+    }
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -139,17 +121,10 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
   }
 
   void _showAddStaffDialog() {
-    final emailCtrl = TextEditingController();
+    if (_storeId == null) return;
     showDialog(
       context: context,
-      builder: (ctx) => _AddStaffDialog(
-        controller: emailCtrl,
-        onAdd: () {
-          _addStaff(emailCtrl.text.trim());
-          Navigator.pop(ctx);
-        },
-        onCancel: () => Navigator.pop(ctx),
-      ),
+      builder: (ctx) => _StaffInviteQRDialog(storeId: _storeId!),
     );
   }
 
@@ -173,6 +148,7 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
   Widget build(BuildContext context) {
     final theme = _SettingsTheme.of(context);
     final user = context.watch<AuthProvider>().user;
+    final staffProvider = context.watch<StaffProvider>();
 
     return Scaffold(
       backgroundColor: theme.bg,
@@ -192,8 +168,8 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
               taglineCtrl: _taglineCtrl,
               deliveryTimeCtrl: _deliveryTimeCtrl,
               deliveryFeeCtrl: _deliveryFeeCtrl,
-              workers: _workers,
-              isLoadingStaff: _isLoadingStaff,
+              workers: staffProvider.staff,
+              isLoadingStaff: staffProvider.isLoading,
               onAddStaff: _showAddStaffDialog,
               onRemoveStaff: _removeStaff,
               onLogout: _showLogoutDialog,
@@ -321,7 +297,7 @@ class _SettingsBody extends StatelessWidget {
   final TextEditingController taglineCtrl;
   final TextEditingController deliveryTimeCtrl;
   final TextEditingController deliveryFeeCtrl;
-  final List<dynamic> workers;
+  final List<StaffMember> workers;
   final bool isLoadingStaff;
   final VoidCallback onAddStaff;
   final ValueChanged<String> onRemoveStaff;
@@ -556,7 +532,7 @@ class _StaffCard extends StatelessWidget {
   });
 
   final _SettingsTheme theme;
-  final List<dynamic> workers;
+  final List<StaffMember> workers;
   final bool isLoading;
   final VoidCallback onAdd;
   final ValueChanged<String> onRemove;
@@ -586,7 +562,7 @@ class _StaffCard extends StatelessWidget {
               (w) => _StaffMemberRow(
                 worker: w,
                 theme: theme,
-                onRemove: () => onRemove(w['id']),
+                onRemove: () => onRemove(w.id),
               ),
             ),
           const Divider(height: 24),
@@ -612,7 +588,7 @@ class _StaffMemberRow extends StatelessWidget {
     required this.onRemove,
   });
 
-  final dynamic worker;
+  final StaffMember worker;
   final _SettingsTheme theme;
   final VoidCallback onRemove;
 
@@ -626,7 +602,7 @@ class _StaffMemberRow extends StatelessWidget {
             radius: 16,
             backgroundColor: AppColors.primary.withValues(alpha: 0.1),
             child: Text(
-              worker['name'][0].toUpperCase(),
+              worker.name[0].toUpperCase(),
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.primary,
@@ -640,7 +616,7 @@ class _StaffMemberRow extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  worker['name'],
+                  worker.name,
                   style: TextStyle(
                     color: theme.textColor,
                     fontWeight: FontWeight.w600,
@@ -648,7 +624,7 @@ class _StaffMemberRow extends StatelessWidget {
                   ),
                 ),
                 Text(
-                  worker['email'],
+                  worker.email,
                   style: TextStyle(color: theme.muted, fontSize: 12),
                 ),
               ],
@@ -808,28 +784,38 @@ class _SettingsTile extends StatelessWidget {
 
 // ─── Dialogs ──────────────────────────────────────────────────────────────
 
-class _AddStaffDialog extends StatelessWidget {
-  const _AddStaffDialog({
-    required this.controller,
-    required this.onAdd,
-    required this.onCancel,
-  });
+class _StaffInviteQRDialog extends StatelessWidget {
+  const _StaffInviteQRDialog({required this.storeId});
 
-  final TextEditingController controller;
-  final VoidCallback onAdd;
-  final VoidCallback onCancel;
+  final String storeId;
 
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Add Staff'),
-      content: TextField(
-        controller: controller,
-        decoration: const InputDecoration(labelText: 'User Email'),
+      title: const Text('Invite Staff', textAlign: TextAlign.center),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text(
+            'Show this QR code to your staff members to join this store.',
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Center(
+            child: SizedBox(
+              width: 200,
+              height: 200,
+              child: QrImageView(
+                data: 'launchfast://store/invite?storeId=$storeId',
+                version: QrVersions.auto,
+                size: 200.0,
+              ),
+            ),
+          ),
+        ],
       ),
       actions: [
-        TextButton(onPressed: onCancel, child: const Text('Cancel')),
-        ElevatedButton(onPressed: onAdd, child: const Text('Add')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Done')),
       ],
     );
   }

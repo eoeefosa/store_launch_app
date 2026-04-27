@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 class Store {
   final String id;
   final String name;
@@ -6,8 +8,6 @@ class Store {
   final String deliveryTime;
   final double rating;
   final bool isOpen;
-  final String? adminUsername;
-  final String? adminPassword;
   final double deliveryFee;
   final String image;
   final String? ownerId;
@@ -21,13 +21,15 @@ class Store {
     required this.deliveryTime,
     required this.rating,
     required this.isOpen,
-    this.adminUsername,
-    this.adminPassword,
     required this.deliveryFee,
     required this.image,
     this.ownerId,
     this.isApproved = true, // Default to true for backward compatibility with static data
   });
+
+  /// Parsed [Color] from the hex [accentColor] string.
+  /// The UI should use this getter instead of parsing the hex manually.
+  Color get color => Color(int.parse(accentColor.replaceFirst('#', '0xFF')));
 
   factory Store.fromJson(Map<String, dynamic> json) {
     return Store(
@@ -38,8 +40,6 @@ class Store {
       deliveryTime: json['deliveryTime'],
       rating: (json['rating'] as num).toDouble(),
       isOpen: json['isOpen'] ?? false,
-      adminUsername: json['adminUsername'],
-      adminPassword: json['adminPassword'],
       deliveryFee: (json['deliveryFee'] as num).toDouble(),
       image: json['image'],
       ownerId: json['ownerId'],
@@ -56,8 +56,6 @@ class Store {
       'deliveryTime': deliveryTime,
       'rating': rating,
       'isOpen': isOpen,
-      'adminUsername': adminUsername,
-      'adminPassword': adminPassword,
       'deliveryFee': deliveryFee,
       'image': image,
       'ownerId': ownerId,
@@ -73,8 +71,6 @@ class Store {
     String? deliveryTime,
     double? rating,
     bool? isOpen,
-    String? adminUsername,
-    String? adminPassword,
     double? deliveryFee,
     String? image,
     String? ownerId,
@@ -88,8 +84,6 @@ class Store {
       deliveryTime: deliveryTime ?? this.deliveryTime,
       rating: rating ?? this.rating,
       isOpen: isOpen ?? this.isOpen,
-      adminUsername: adminUsername ?? this.adminUsername,
-      adminPassword: adminPassword ?? this.adminPassword,
       deliveryFee: deliveryFee ?? this.deliveryFee,
       image: image ?? this.image,
       ownerId: ownerId ?? this.ownerId,

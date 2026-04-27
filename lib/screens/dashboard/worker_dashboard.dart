@@ -4,9 +4,9 @@ import 'package:provider/provider.dart';
 import 'package:store_launchfast/constants/app_colors.dart';
 import 'package:store_launchfast/providers/auth_provider.dart';
 import 'package:store_launchfast/providers/store_provider.dart';
-import 'package:store_launchfast/services/api_service.dart';
+import 'package:store_launchfast/repositories/order_repository.dart';
+import 'package:store_launchfast/models/order.dart';
 import 'package:store_launchfast/services/ably_service.dart';
-// import 'package:store_launchfast/models/order.dart';
 import 'package:intl/intl.dart';
 
 class WorkerDashboardHome extends StatefulWidget {
@@ -24,7 +24,7 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
   int _preparingCount = 0;
   int _readyCount = 0;
 
-  List<dynamic> _recentOrders = [];
+  List<Order> _recentOrders = [];
   bool _isLoading = true;
   String? _storeId;
   String? _storeName;
@@ -78,28 +78,15 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
 
   Future<void> _loadStats() async {
     try {
-      final res = await apiService.dio.get('/orders');
-      final List orders = res.data ?? [];
-
-      final storeOrders = _storeId != null
-          ? orders.where((o) {
-              final sIds = (o['storeIds'] as List?) ?? [];
-              return sIds.contains(_storeId);
-            }).toList()
-          : orders;
+      if (_storeId == null) return;
+      final stats = await orderRepository.getStoreStats(_storeId!);
 
       if (mounted) {
         setState(() {
-          _totalOrders = storeOrders.length;
-          _pendingCount = storeOrders
-              .where((o) => o['status'] == 'PENDING')
-              .length;
-          _preparingCount = storeOrders
-              .where((o) => o['status'] == 'PREPARING')
-              .length;
-          _readyCount = storeOrders
-              .where((o) => o['status'] == 'READY_FOR_PICKUP')
-              .length;
+          _totalOrders = stats.totalOrders;
+          _pendingCount = stats.pendingOrders;
+          _preparingCount = stats.preparingOrders;
+          _readyCount = 0; // Ready count not yet in StoreStats
         });
       }
     } catch (_) {}
@@ -108,19 +95,13 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
   Future<void> _loadRecentOrders() async {
     setState(() => _isLoading = true);
     try {
-      final res = await apiService.dio.get('/orders');
-      final List orders = res.data ?? [];
-
-      final filtered = _storeId != null
-          ? orders.where((o) {
-              final sIds = (o['storeIds'] as List?) ?? [];
-              return sIds.contains(_storeId);
-            }).toList()
-          : orders;
+      if (_storeId == null) return;
+      final orders = await orderRepository.getStoreOrders(_storeId!);
+      orders.sort((a, b) => b.date.compareTo(a.date));
 
       if (mounted) {
         setState(() {
-          _recentOrders = filtered.take(5).toList();
+          _recentOrders = orders.take(5).toList();
           _isLoading = false;
         });
       }
@@ -379,7 +360,7 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
 
     return Column(
       children: _recentOrders.map((o) {
-        final date = DateTime.parse(o['date']);
+        final date = DateTime.parse(o.date);
         return Container(
           margin: const EdgeInsets.only(bottom: 12),
           padding: const EdgeInsets.all(16),
@@ -410,7 +391,7 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Order #${o['id'].toString().substring(o['id'].toString().length - 5)}',
+                      'Order #${o.id.substring(o.id.length - 5)}',
                       style: TextStyle(
                         color: textColor,
                         fontWeight: FontWeight.bold,
@@ -429,13 +410,13 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: _getStatusColor(o['status']).withValues(alpha: 0.1),
+                  color: _getStatusColor(o.status).withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  o['status'],
+                  o.status.name,
                   style: TextStyle(
-                    color: _getStatusColor(o['status']),
+                    color: _getStatusColor(o.status),
                     fontSize: 11,
                     fontWeight: FontWeight.bold,
                   ),
@@ -444,21 +425,21 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
             ],
           ),
         );
-      }).toList(),
+    }).toList(),
     );
   }
 
-  Color _getStatusColor(String status) {
+  Color _getStatusColor(OrderStatus status) {
     switch (status) {
-      case 'PENDING':
+      case OrderStatus.pending:
         return Colors.orange;
-      case 'PREPARING':
+      case OrderStatus.preparing:
         return Colors.blue;
-      case 'READY_FOR_PICKUP':
+      case OrderStatus.readyForPickup:
         return Colors.green;
-      case 'DELIVERED':
+      case OrderStatus.delivered:
         return Colors.grey;
-      case 'CANCELLED':
+      case OrderStatus.cancelled:
         return Colors.red;
       default:
         return Colors.blue;

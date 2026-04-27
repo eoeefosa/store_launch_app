@@ -11,7 +11,8 @@ class AwaitingApprovalScreen extends StatefulWidget {
   State<AwaitingApprovalScreen> createState() => _AwaitingApprovalScreenState();
 }
 
-class _AwaitingApprovalScreenState extends State<AwaitingApprovalScreen> with SingleTickerProviderStateMixin {
+class _AwaitingApprovalScreenState extends State<AwaitingApprovalScreen>
+    with SingleTickerProviderStateMixin {
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   late Animation<double> _scaleAnimation;
@@ -24,13 +25,15 @@ class _AwaitingApprovalScreenState extends State<AwaitingApprovalScreen> with Si
       vsync: this,
     )..repeat(reverse: true);
 
-    _fadeAnimation = Tween<double>(begin: 0.5, end: 1.0).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.5,
+      end: 1.0,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
 
-    _scaleAnimation = Tween<double>(begin: 0.95, end: 1.05).animate(
-      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
-    );
+    _scaleAnimation = Tween<double>(
+      begin: 0.95,
+      end: 1.05,
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
   }
 
   @override
@@ -42,7 +45,7 @@ class _AwaitingApprovalScreenState extends State<AwaitingApprovalScreen> with Si
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    
+
     // Auto-redirect if approved in real-time
     if (auth.isStoreApproved) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -59,9 +62,9 @@ class _AwaitingApprovalScreenState extends State<AwaitingApprovalScreen> with Si
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: isDark 
-              ? [const Color(0xFF1A1A1A), const Color(0xFF000000)]
-              : [const Color(0xFFF8F9FA), const Color(0xFFE9ECEF)],
+            colors: isDark
+                ? [const Color(0xFF1A1A1A), const Color(0xFF000000)]
+                : [const Color(0xFFF8F9FA), const Color(0xFFE9ECEF)],
           ),
         ),
         child: SafeArea(
@@ -77,7 +80,7 @@ class _AwaitingApprovalScreenState extends State<AwaitingApprovalScreen> with Si
                     child: Container(
                       padding: const EdgeInsets.all(24),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withOpacity(0.1),
+                        color: AppColors.primary.withValues(alpha: 0.1),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
@@ -110,12 +113,14 @@ class _AwaitingApprovalScreenState extends State<AwaitingApprovalScreen> with Si
                 Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: isDark ? Colors.white.withOpacity(0.05) : Colors.white,
+                    color: isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.white,
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       if (!isDark)
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+                          color: Colors.black.withValues(alpha: 0.05),
                           blurRadius: 10,
                           offset: const Offset(0, 4),
                         ),

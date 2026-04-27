@@ -1,5 +1,6 @@
 import '../services/api_service.dart';
 import '../models/order.dart';
+import '../models/store_stats.dart';
 
 class OrderRepository {
   Future<List<Order>> getOrders() async {
@@ -7,9 +8,34 @@ class OrderRepository {
     return (response.data as List).map((i) => Order.fromJson(i)).toList();
   }
 
+  Future<List<Order>> getStoreOrders(String storeId) async {
+    final response = await apiService.dio.get('/orders');
+    final List<Order> allOrders = (response.data as List).map((i) => Order.fromJson(i)).toList();
+    // In a real app, backend should filter by storeId using a query param like /orders?storeId=xyz
+    // For now, doing local filtering to match the old implementation and ensure backward compatibility
+    return allOrders.where((o) => o.stores.any((s) => s.id == storeId)).toList();
+  }
+
   Future<Order> placeOrder(Map<String, dynamic> orderData) async {
     final response = await apiService.dio.post('/orders', data: orderData);
     return Order.fromJson(response.data);
+  }
+
+  Future<StoreStats> getStoreStats(String storeId) async {
+    try {
+      final response = await apiService.dio.get('/stores/$storeId/stats');
+      return StoreStats.fromJson(response.data);
+    } catch (_) {
+      // Backend endpoint may not exist yet — return empty stats
+      // so the UI degrades gracefully instead of crashing.
+      return StoreStats(
+        revenue: 0,
+        totalOrders: 0,
+        pendingOrders: 0,
+        preparingOrders: 0,
+        topSellingItems: {},
+      );
+    }
   }
 
   Future<List<Order>> getMyOrders() async {

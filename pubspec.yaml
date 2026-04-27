@@ -45,6 +45,9 @@ dependencies:
   ably_flutter: ^1.2.18
   font_awesome_flutter: ^11.0.0
   flutter_animate: ^4.5.2
+  image_picker: ^1.0.7
+  audioplayers: ^5.2.1
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

@@ -31,7 +31,7 @@ class CartProvider with ChangeNotifier {
         final List<dynamic> cartList = jsonDecode(cartStr);
         _items = cartList.map((i) => CartItem.fromJson(i)).toList();
       } catch (e) {
-        // print('Failed to load cart: $e');
+        debugPrint('Failed to load cart: $e');
       }
     }
     _isLoaded = true;
@@ -189,10 +189,10 @@ class CartProvider with ChangeNotifier {
       // Addons extras
       if (item.selectedAddons != null) {
         item.selectedAddons!.forEach((addonId, count) {
-          final addonItem = StaticData.menuItems.firstWhere(
-            (m) => m.id == addonId,
-          );
-          itemPrice += addonItem.price * count;
+          final addonItem = StaticData.menuItemsMap[addonId];
+          if (addonItem != null) {
+            itemPrice += addonItem.price * count;
+          }
         });
       }
 

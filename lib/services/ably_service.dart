@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:ably_flutter/ably_flutter.dart' as ably;
+import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import '../models/order.dart';
 
@@ -57,7 +58,7 @@ class AblyService {
               response.data as Map<String, dynamic>,
             );
           } catch (e) {
-            // print('Ably Auth Error: $e');
+            debugPrint('Ably Auth Error: $e');
             throw Exception('Failed to get Ably token');
           }
         }
@@ -98,7 +99,7 @@ class AblyService {
             cb(orderId, status);
           }
         } catch (e) {
-          // print('Error processing order update message: $e');
+          debugPrint('Error processing order update message: $e');
         }
       },
     );
@@ -112,7 +113,7 @@ class AblyService {
           cb(newRole);
         }
       } catch (e) {
-        // print("Error processing role update message: $e");
+        debugPrint("Error processing role update message: $e");
       }
     });
 
@@ -125,7 +126,7 @@ class AblyService {
           cb(storeId);
         }
       } catch (e) {
-        // print("Error processing store approval message: $e");
+        debugPrint("Error processing store approval message: $e");
       }
     });
 
@@ -137,7 +138,7 @@ class AblyService {
           cb(data);
         }
       } catch (e) {
-        // print("Error processing generic notification message: $e");
+        debugPrint("Error processing generic notification message: $e");
       }
     });
 
@@ -157,7 +158,7 @@ class AblyService {
               cb(storeId, isOpen);
             }
           } catch (e) {
-            // print('Error processing store toggle message: $e');
+            debugPrint('Error processing store toggle message: $e');
           }
         });
 
@@ -210,7 +211,9 @@ class AblyService {
         for (final cb in _orderListeners) {
           cb(orderId, OrderStatus.pending);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error processing new order: $e');
+      }
     });
 
     // Listen for status updates
@@ -225,7 +228,9 @@ class AblyService {
         for (final cb in _orderListeners) {
           cb(orderId, status);
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('Error processing order status update: $e');
+      }
     });
   }
 
@@ -320,7 +325,7 @@ class AblyService {
     _roleListeners.clear();
     _approvalListeners.clear();
     _isConnecting = false;
-    // print('Ably disconnected and listeners cleared');
+    debugPrint('Ably disconnected and listeners cleared');
   }
 }
 

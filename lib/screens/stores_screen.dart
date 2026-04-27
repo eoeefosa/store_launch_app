@@ -55,9 +55,7 @@ class StoresScreen extends StatelessWidget {
               child: Container(
                 height: 160,
                 width: double.infinity,
-                color: Color(
-                  int.parse(store.accentColor.replaceFirst('#', '0xFF')),
-                ),
+                color: store.color,
                 child: Stack(
                   children: [
                     Center(

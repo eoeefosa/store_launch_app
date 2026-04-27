@@ -5,8 +5,8 @@ import 'package:store_launchfast/constants/app_colors.dart';
 import 'package:store_launchfast/providers/auth_provider.dart';
 import 'package:store_launchfast/providers/store_provider.dart';
 import 'package:store_launchfast/models/order.dart';
-import 'package:store_launchfast/services/api_service.dart';
 import 'package:store_launchfast/services/ably_service.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class StoreDashboardHome extends StatefulWidget {
   const StoreDashboardHome({super.key});
@@ -27,6 +27,7 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
   // ─── Recent orders (live) ─────────────────────────────────────────
   List<Order> _recentOrders = [];
   bool _ordersLoading = true;
+  List<MapEntry<String, int>> _topSellingItems = [];
 
   // ─── Store toggle ─────────────────────────────────────────────────
   bool? _isOpen; // null = not yet loaded
@@ -37,9 +38,10 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
   StreamSubscription? _ablyNewOrderSub;
   bool _hasNewOrder = false;
 
-  // ─── Animation ────────────────────────────────────────────────────
+  // ─── Animation & Audio ────────────────────────────────────────────
   late AnimationController _pulseCtrl;
   late Animation<double> _pulse;
+  late AudioPlayer _audioPlayer;
 
   @override
   void initState() {
@@ -47,11 +49,14 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
     _pulseCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
+    );
     _pulse = Tween<double>(
       begin: 0.95,
       end: 1.05,
     ).animate(CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut));
+    
+    _audioPlayer = AudioPlayer();
+    _audioPlayer.setReleaseMode(ReleaseMode.loop);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _init();
@@ -59,76 +64,53 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
   }
 
   Future<void> _init() async {
-    await _loadStoreInfo();
+    _loadStoreInfo();
     await Future.wait([_loadStats(), _loadRecentOrders()]);
     _subscribeAbly();
   }
 
-  // ─── Load the owner's store from the already-fetched StoreProvider ─
-  Future<void> _loadStoreInfo() async {
-    final auth = context.read<AuthProvider>();
+  // ─── Load the owner's store from the StoreProvider ────────────────
+  void _loadStoreInfo() {
     final storeProvider = context.read<StoreProvider>();
-    if (storeProvider.stores.isEmpty) {
-      await storeProvider.refreshData();
-    }
-    // Find store owned by the current user
-    final stores = storeProvider.stores;
-    final userId = auth.user?.id;
-    if (stores.isNotEmpty && userId != null) {
-      try {
-        final owned = stores.firstWhere(
-          (s) => s.ownerId == userId,
-          orElse: () => stores.first, // fallback if ownerId not set yet
-        );
-        if (mounted) {
-          setState(() {
-            _storeId = owned.id;
-            _isOpen = owned.isOpen;
-          });
-        }
-      } catch (_) {}
+    final owned = storeProvider.ownedStore;
+    if (owned != null && mounted) {
+      setState(() {
+        _storeId = owned.id;
+        _isOpen = owned.isOpen;
+      });
     }
   }
 
   Future<void> _loadStats() async {
     try {
-      final res = await apiService.dio.get('/orders');
-      final List orders = res.data ?? [];
-      final storeOrders = _storeId != null
-          ? orders.where((o) {
-              final storeIds = (o['storeIds'] as List?) ?? [];
-              return storeIds.contains(_storeId);
-            }).toList()
-          : orders;
+      final storeProvider = context.read<StoreProvider>();
+      final stats = await storeProvider.fetchStoreStats();
 
-      double rev = 0;
-      int pending = 0;
-      int preparing = 0;
-      for (final o in storeOrders) {
-        final s = (o['status'] as String?)?.toUpperCase() ?? '';
-        if (s == 'DELIVERED') rev += (o['total'] as num?)?.toDouble() ?? 0;
-        if (s == 'PENDING') pending++;
-        if (s == 'PREPARING') preparing++;
-      }
       if (mounted) {
         setState(() {
-          _revenue = rev;
-          _totalOrders = storeOrders.length;
-          _pendingOrders = pending;
-          _preparingOrders = preparing;
+          _revenue = stats.revenue;
+          _totalOrders = stats.totalOrders;
+          _pendingOrders = stats.pendingOrders;
+          _preparingOrders = stats.preparingOrders;
+          _topSellingItems = stats.topSellingItems.entries.toList();
           _statsLoading = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _statsLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _statsLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load store statistics')),
+        );
+      }
     }
   }
 
   Future<void> _loadRecentOrders() async {
     try {
-      final res = await apiService.dio.get('/orders');
-      final List raw = res.data ?? [];
-      final orders = raw.map((o) => Order.fromJson(o)).toList();
+      final storeProvider = context.read<StoreProvider>();
+      final orders = await storeProvider.fetchStoreOrders();
+          
       orders.sort((a, b) => b.date.compareTo(a.date));
       if (mounted) {
         setState(() {
@@ -136,29 +118,43 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
           _ordersLoading = false;
         });
       }
-    } catch (_) {
-      if (mounted) setState(() => _ordersLoading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() => _ordersLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to load recent orders')),
+        );
+      }
     }
   }
 
   void _subscribeAbly() {
     // Subscribe to admin:orders via Ably for new-order notifications
     // We repurpose the store-listener mechanism to refresh when any order arrives
-    ablyService.addStoreListener((storeId, isOpen) {
-      if (storeId == _storeId && mounted) {
-        setState(() => _isOpen = isOpen);
+    ablyService.addStoreListener(_onStoreToggle);
+  }
+
+  Future<void> _onStoreToggle(String storeId, bool isOpen) async {
+    if (storeId == _storeId && mounted) {
+      setState(() {
+        _isOpen = isOpen;
+        _hasNewOrder = true;
+      });
+      _pulseCtrl.repeat(reverse: true);
+      try {
+        await _audioPlayer.play(AssetSource('notification.mp3'));
+      } catch (e) {
+        debugPrint('[Dashboard] Audio playback failed: $e');
       }
-    });
+    }
   }
 
   Future<void> _toggleStore(bool value) async {
     if (_storeId == null || _toggling) return;
     setState(() => _toggling = true);
     try {
-      await apiService.dio.patch(
-        '/stores/$_storeId/toggle',
-        data: {'isOpen': value},
-      );
+      final storeProvider = context.read<StoreProvider>();
+      await storeProvider.toggleStoreStatus(value);
       setState(() => _isOpen = value);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -197,13 +193,15 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
       _statsLoading = true;
       _ordersLoading = true;
     });
-    await Future.wait([_loadStats(), _loadRecentOrders(), _loadStoreInfo()]);
+    await Future.wait([_loadStats(), _loadRecentOrders(), _loadStoreInfo()] as Iterable<Future<dynamic>>);
   }
 
   @override
   void dispose() {
     _pulseCtrl.dispose();
     _ablyNewOrderSub?.cancel();
+    ablyService.removeStoreListener(_onStoreToggle);
+    _audioPlayer.dispose();
     super.dispose();
   }
 
@@ -215,7 +213,7 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
     final textColor = isDark ? AppColors.darkText : AppColors.lightText;
     final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
     final border = isDark ? AppColors.darkBorder : AppColors.lightBorder;
-    final user = context.watch<AuthProvider>().user;
+    final user = context.select<AuthProvider, dynamic>((p) => p.user);
 
     return Scaffold(
       backgroundColor: bg,
@@ -234,7 +232,7 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
                 background: Container(
                   decoration: const BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [AppColors.primary, Color(0xFFFF9A5C)],
+                      colors: [AppColors.primary, AppColors.primary],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
@@ -291,7 +289,12 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
                         ),
                     ],
                   ),
-                  onPressed: () => setState(() => _hasNewOrder = false),
+                  onPressed: () {
+                    setState(() => _hasNewOrder = false);
+                    _pulseCtrl.stop();
+                    _pulseCtrl.reset();
+                    _audioPlayer.stop();
+                  },
                 ),
                 const SizedBox(width: 8),
               ],
@@ -305,7 +308,33 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
                   children: [
                     // ── STORE STATUS CARD ──
                     _buildStatusCard(isDark, surface, border, muted),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
+                    
+                    // ── BUSY MODE BUTTON ──
+                    if (_isOpen == true) ...[
+                      ElevatedButton.icon(
+                        onPressed: () => _toggleStore(false),
+                        icon: const Icon(Icons.pause_circle_filled),
+                        label: const Text(
+                          'BUSY MODE: PAUSE ORDERS',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.shade700,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(56),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                    ] else ...[
+                      const SizedBox(height: 8),
+                    ],
+
+                    // ── TOP SELLING ITEMS ──
+                    _buildTopSellingItems(isDark, surface, border, muted, textColor),
 
                     // ── STATS GRID ──
                     Text(
@@ -573,6 +602,52 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: border),
       ),
+    );
+  }
+
+  Widget _buildTopSellingItems(bool isDark, Color surface, Color border, Color muted, Color textColor) {
+    if (_statsLoading || _topSellingItems.isEmpty) return const SizedBox();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Top Selling Items',
+          style: TextStyle(
+            color: textColor,
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          decoration: BoxDecoration(
+            color: surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: border),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Column(
+            children: _topSellingItems.map((entry) {
+              return ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: AppColors.primary.withValues(alpha: 0.1),
+                  child: const Icon(Icons.trending_up, color: AppColors.primary, size: 20),
+                ),
+                title: Text(
+                  entry.key,
+                  style: TextStyle(color: textColor, fontWeight: FontWeight.w600),
+                ),
+                trailing: Text(
+                  '${entry.value} sold',
+                  style: TextStyle(color: muted, fontWeight: FontWeight.w600),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 24),
+      ],
     );
   }
 

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 // import 'dart:io';
 
@@ -6,11 +7,10 @@ class ApiService {
   late Dio dio;
   final storage = const FlutterSecureStorage();
 
-  // Use 10.0.2.2 for Android Emulator, localhost for iOS simulator
-  static const String baseUrl = 'https://backend-lauchfast.vercel.app/api';
-
-  // To test production, uncomment this instead:
-  // static const String baseUrl = 'https://backend-lauchfast.vercel.app/api';
+  static const String baseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://backend-lauchfast.vercel.app/api',
+  );
 
   ApiService() {
     dio = Dio(
@@ -41,11 +41,11 @@ class ApiService {
           return handler.next(response);
         },
         onError: (DioException e, handler) {
-          // print(
-          //   '❌ [API Error] ${e.response?.statusCode ?? 'Timeout'} ${e.requestOptions.path}',
-          // );
-          // print('Message: ${e.response?.data?['error'] ?? e.message}');
-          // return handler.next(e);
+          debugPrint(
+            '❌ [API Error] ${e.response?.statusCode ?? 'Timeout'} ${e.requestOptions.path}',
+          );
+          debugPrint('Message: ${e.response?.data?['error'] ?? e.message}');
+          return handler.next(e);
         },
       ),
     );

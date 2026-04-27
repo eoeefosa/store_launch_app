@@ -22,6 +22,9 @@ class _StoreMainNavState extends State<StoreMainNav>
     with TickerProviderStateMixin {
   int _currentIndex = 0;
 
+  // Pages are built once and kept alive via IndexedStack
+  late final List<Widget> _pages;
+
   // ─── Real-time notification state ─────────────────────────────────
   int _newOrderCount = 0;
   bool _ablyInitialized = false;
@@ -64,6 +67,13 @@ class _StoreMainNavState extends State<StoreMainNav>
       end: 1.2,
     ).animate(CurvedAnimation(parent: _badgeCtrl, curve: Curves.elasticOut));
 
+    _pages = [
+      StoreDashboardHome(),
+      StoreOrdersScreen(),
+      StoreMenuScreen(),
+      StoreSettingsScreen(),
+    ];
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _initAbly());
   }
 
@@ -74,28 +84,32 @@ class _StoreMainNavState extends State<StoreMainNav>
     final userId = auth.user?.id;
     if (userId == null) return;
 
+    // Tell the provider who the owner is — all child screens will use this
+    storeProvider.setOwner(userId);
+
     try {
       await ablyService.initAbly(userId);
 
       // Listen for new orders via the order-update listener
-      ablyService.addOrderListener((orderId, status) {
-        // When a new PENDING order arrives, bump the badge on Orders tab
-        if (status == OrderStatus.pending && mounted) {
-          setState(() => _newOrderCount++);
-          _badgeCtrl.repeat(reverse: true);
-        }
-      });
+      ablyService.addOrderListener(_onAblyOrderUpdate);
 
-      // Find owned store and subscribe to its specific orders channel
+      // Subscribe to the owned store's orders channel
       if (storeProvider.stores.isEmpty) await storeProvider.refreshData();
-      final owned = storeProvider.stores.firstWhere(
-        (s) => s.ownerId == userId,
-        orElse: () => storeProvider.stores.first,
-      );
-      ablyService.subscribeToStoreOrders(owned.id);
+      final ownedId = storeProvider.ownedStoreId;
+      if (ownedId != null) {
+        ablyService.subscribeToStoreOrders(ownedId);
+      }
 
       _ablyInitialized = true;
     } catch (_) {}
+  }
+
+  void _onAblyOrderUpdate(String orderId, OrderStatus status) {
+    // When a new PENDING order arrives, bump the badge on Orders tab
+    if (status == OrderStatus.pending && mounted) {
+      setState(() => _newOrderCount++);
+      _badgeCtrl.repeat(reverse: true);
+    }
   }
 
   void _onTabTapped(int index) {
@@ -109,6 +123,9 @@ class _StoreMainNavState extends State<StoreMainNav>
   @override
   void dispose() {
     _badgeCtrl.dispose();
+    if (_ablyInitialized) {
+      ablyService.removeOrderListener(_onAblyOrderUpdate);
+    }
     super.dispose();
   }
 
@@ -118,24 +135,12 @@ class _StoreMainNavState extends State<StoreMainNav>
     final navBg = isDark ? AppColors.darkSurface : AppColors.lightBackground;
     final navBorder = isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
-    // Pages (kept const where possible for performance)
-    final pages = [
-      StoreDashboardHome(),
-      StoreOrdersScreen(),
-      StoreMenuScreen(),
-      StoreSettingsScreen(),
-    ];
-
     return Scaffold(
       body: Consumer2<AuthProvider, StoreProvider>(
         builder: (context, auth, storeProvider, child) {
-          final userId = auth.user?.id;
-          final ownedStore = storeProvider.stores.firstWhere(
-            (s) => s.ownerId == userId,
-            orElse: () => storeProvider.stores.first,
-          );
+          final ownedStore = storeProvider.ownedStore;
 
-          if (!ownedStore.isApproved) {
+          if (ownedStore == null || !ownedStore.isApproved) {
             return Center(
               child: Padding(
                 padding: const EdgeInsets.all(32.0),
@@ -150,7 +155,7 @@ class _StoreMainNavState extends State<StoreMainNav>
                     ),
                     const SizedBox(height: 16),
                     Text(
-                      'Your store "${ownedStore.name}" is currently being reviewed by our administrators. You will be notified once it is approved.',
+                      'Your store "${ownedStore?.name ?? 'your store'}" is currently being reviewed by our administrators. You will be notified once it is approved.',
                       textAlign: TextAlign.center,
                       style: TextStyle(fontSize: 16, color: Colors.grey[600]),
                     ),
@@ -169,14 +174,9 @@ class _StoreMainNavState extends State<StoreMainNav>
             );
           }
 
-          return AnimatedSwitcher(
-            duration: const Duration(milliseconds: 220),
-            switchInCurve: Curves.easeOut,
-            switchOutCurve: Curves.easeIn,
-            child: KeyedSubtree(
-              key: ValueKey(_currentIndex),
-              child: pages[_currentIndex],
-            ),
+          return IndexedStack(
+            index: _currentIndex,
+            children: _pages,
           );
         },
       ),

@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:store_launchfast/constants/app_colors.dart';
 import 'package:store_launchfast/models/order.dart';
-import 'package:store_launchfast/repositories/order_repository.dart';
+import 'package:store_launchfast/providers/store_provider.dart';
 import 'package:store_launchfast/services/ably_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class StoreOrdersScreen extends StatefulWidget {
   const StoreOrdersScreen({super.key});
@@ -16,16 +18,16 @@ class _StoreOrdersScreenState extends State<StoreOrdersScreen>
     with TickerProviderStateMixin {
   List<Order> _orders = [];
   bool _isLoading = true;
-  String _filter = 'ALL';
+  OrderStatus? _filter; // null = ALL
   late TabController _tabController;
 
-  final List<String> _filters = [
-    'ALL',
-    'PENDING',
-    'PREPARING',
-    'READY',
-    'DELIVERED',
-    'CANCELLED',
+  static const List<OrderStatus?> _filters = [
+    null, // ALL
+    OrderStatus.pending,
+    OrderStatus.preparing,
+    OrderStatus.readyForPickup,
+    OrderStatus.delivered,
+    OrderStatus.cancelled,
   ];
 
   // Ably: badge for new orders
@@ -59,10 +61,21 @@ class _StoreOrdersScreenState extends State<StoreOrdersScreen>
   Future<void> _loadOrders() async {
     setState(() => _isLoading = true);
     try {
-      final orders = await orderRepository.getOrders();
+      final storeProvider = context.read<StoreProvider>();
+      final orders = await storeProvider.fetchStoreOrders();
       orders.sort((a, b) => b.date.compareTo(a.date));
       if (mounted) setState(() => _orders = orders);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('[OrderScreen] _loadOrders error: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Failed to load orders'),
+            backgroundColor: Colors.red.shade700,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
     } finally {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -78,34 +91,19 @@ class _StoreOrdersScreenState extends State<StoreOrdersScreen>
   }
 
   List<Order> get _filtered {
-    if (_filter == 'ALL') return _orders;
-    return _orders.where((o) {
-      final _ = o.status.name.toUpperCase().replaceAll(' ', '_');
-      switch (_filter) {
-        case 'PENDING':
-          return o.status == OrderStatus.pending;
-        case 'PREPARING':
-          return o.status == OrderStatus.preparing;
-        case 'READY':
-          return o.status == OrderStatus.readyForPickup;
-        case 'DELIVERED':
-          return o.status == OrderStatus.delivered;
-        case 'CANCELLED':
-          return o.status == OrderStatus.cancelled;
-        default:
-          return true;
-      }
-    }).toList();
+    if (_filter == null) return _orders;
+    return _orders.where((o) => o.status == _filter).toList();
   }
 
-  Future<void> _updateStatus(String orderId, String newStatus) async {
+  Future<void> _updateStatus(String orderId, OrderStatus newStatus) async {
     try {
-      await orderRepository.updateOrderStatus(orderId, newStatus);
+      final storeProvider = context.read<StoreProvider>();
+      await storeProvider.updateOrderStatus(orderId, newStatus.backendName);
       await _loadOrders();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Order updated to ${newStatus.toLowerCase()}'),
+            content: Text('Order updated to ${newStatus.name}'),
             backgroundColor: Colors.green.shade700,
             behavior: SnackBarBehavior.floating,
             shape: RoundedRectangleBorder(
@@ -115,6 +113,7 @@ class _StoreOrdersScreenState extends State<StoreOrdersScreen>
         );
       }
     } catch (e) {
+      debugPrint('[OrderScreen] _updateStatus error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -229,15 +228,9 @@ class _StoreOrdersScreenState extends State<StoreOrdersScreen>
     );
   }
 
-  String _tabLabel(String filter) {
-    switch (filter) {
-      case 'READY':
-        return 'Ready';
-      case 'ALL':
-        return 'All';
-      default:
-        return filter[0] + filter.substring(1).toLowerCase();
-    }
+  String _tabLabel(OrderStatus? filter) {
+    if (filter == null) return 'All';
+    return filter.name;
   }
 
   Widget _emptyState(Color muted) {
@@ -264,7 +257,7 @@ class _OrderCard extends StatelessWidget {
   final Color muted;
   final Color surface;
   final Color border;
-  final Future<void> Function(String orderId, String status) onUpdateStatus;
+  final Future<void> Function(String orderId, OrderStatus status) onUpdateStatus;
 
   const _OrderCard({
     required this.order,
@@ -304,17 +297,17 @@ class _OrderCard extends StatelessWidget {
         return [
           _ActionBtn(
             'Accept',
-            'ACCEPTED',
+            OrderStatus.accepted,
             Colors.green,
             Icons.check_circle_outline,
           ),
-          _ActionBtn('Reject', 'CANCELLED', Colors.red, Icons.cancel_outlined),
+          _ActionBtn('Reject', OrderStatus.cancelled, Colors.red, Icons.cancel_outlined),
         ];
       case OrderStatus.accepted:
         return [
           _ActionBtn(
             'Start Preparing',
-            'PREPARING',
+            OrderStatus.preparing,
             const Color(0xFF06B6D4),
             Icons.soup_kitchen_outlined,
           ),
@@ -323,7 +316,7 @@ class _OrderCard extends StatelessWidget {
         return [
           _ActionBtn(
             'Mark Ready',
-            'READY_FOR_PICKUP',
+            OrderStatus.readyForPickup,
             const Color(0xFF8B5CF6),
             Icons.done_all,
           ),
@@ -422,33 +415,88 @@ class _OrderCard extends StatelessWidget {
             Divider(color: border, height: 1),
             const SizedBox(height: 12),
 
-            // ── Items ──
-            ...order.items
-                .take(3)
-                .map(
-                  (item) => Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            // ── Customer Info ──
+            if (order.user != null) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${item.quantity}× ${item.menuItem.name}',
-                          style: TextStyle(color: textColor, fontSize: 13),
+                          order.user!.name,
+                          style: TextStyle(
+                            color: textColor,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
                         ),
-                        Text(
-                          '₦${((item.menuItem.price) * item.quantity).toStringAsFixed(0)}',
-                          style: TextStyle(color: muted, fontSize: 13),
-                        ),
+                        if (order.user!.phone != null && order.user!.phone!.isNotEmpty)
+                          Text(
+                            order.user!.phone!,
+                            style: TextStyle(color: muted, fontSize: 13),
+                          ),
                       ],
                     ),
                   ),
-                ),
-
-            if (order.items.length > 3)
-              Text(
-                '+${order.items.length - 3} more item(s)',
-                style: TextStyle(color: muted, fontSize: 12),
+                  if (order.user!.phone != null && order.user!.phone!.isNotEmpty)
+                    IconButton(
+                      icon: const Icon(Icons.phone, color: AppColors.primary),
+                      onPressed: () async {
+                        final uri = Uri.parse('tel:${order.user!.phone}');
+                        if (await canLaunchUrl(uri)) {
+                          await launchUrl(uri);
+                        }
+                      },
+                    ),
+                ],
               ),
+              const SizedBox(height: 8),
+              Divider(color: border, height: 1),
+              const SizedBox(height: 12),
+            ],
+
+            // ── Items ──
+            ...order.items.map(
+              (item) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '${item.quantity}× ${item.menuItem.name}',
+                            style: TextStyle(
+                              color: textColor,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          '₦${((item.menuItem.price) * item.quantity).toStringAsFixed(0)}',
+                          style: TextStyle(color: muted, fontSize: 14),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    if (item.hasSalad)
+                      Text('• Salad', style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600)),
+                    if (item.extras != null && item.extras!.isNotEmpty)
+                      Text('• Extras: ${item.extras!.join(", ")}', style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600)),
+                    if (item.selectedMeats != null && item.selectedMeats!.isNotEmpty)
+                      ...item.selectedMeats!.entries.map((e) => Text('• Meat: ${e.key} (x${e.value})', style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600))),
+                    if (item.selectedAddons != null && item.selectedAddons!.isNotEmpty)
+                      ...item.selectedAddons!.entries.map((e) => Text('• Addon: ${e.key} (x${e.value})', style: TextStyle(color: textColor, fontSize: 13, fontWeight: FontWeight.w600))),
+                  ],
+                ),
+              ),
+            ),
 
             const SizedBox(height: 12),
             Divider(color: border, height: 1),
@@ -541,7 +589,7 @@ class _OrderCard extends StatelessWidget {
 
 class _ActionBtn {
   final String label;
-  final String status;
+  final OrderStatus status;
   final Color color;
   final IconData icon;
   const _ActionBtn(this.label, this.status, this.color, this.icon);

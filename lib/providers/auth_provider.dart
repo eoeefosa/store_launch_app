@@ -36,13 +36,10 @@ class AuthProvider with ChangeNotifier {
       : null;
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
-    // By passing clientId directly, we prevent a native crash on iOS if GoogleService-Info.plist is missing.
     clientId: Platform.isIOS
-        ? '471745302305-ja90tj0aatmq2e7i6rjei1v08bpb2nvp.apps.googleusercontent.com'
-        : '471745302305-lj75e24f9iabb6c9e3hkguha505omn9q.apps.googleusercontent.com',
-    // The serverClientId is required to get an idToken for some backend verification flows
-    serverClientId:
-        '471745302305-tts3kroutn6jofuvcldfckjk4j7et6l2.apps.googleusercontent.com',
+        ? const String.fromEnvironment('IOS_CLIENT_ID', defaultValue: '471745302305-ja90tj0aatmq2e7i6rjei1v08bpb2nvp.apps.googleusercontent.com')
+        : const String.fromEnvironment('WEB_CLIENT_ID', defaultValue: '471745302305-lj75e24f9iabb6c9e3hkguha505omn9q.apps.googleusercontent.com'),
+    serverClientId: const String.fromEnvironment('SERVER_CLIENT_ID', defaultValue: '471745302305-tts3kroutn6jofuvcldfckjk4j7et6l2.apps.googleusercontent.com'),
   );
 
   AuthProvider() {
@@ -68,7 +65,7 @@ class AuthProvider with ChangeNotifier {
         _setupAblyListeners();
       }
     } catch (e) {
-      // print('Failed to load auth data: $e');
+      debugPrint('Failed to load auth data: $e');
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -178,7 +175,7 @@ class AuthProvider with ChangeNotifier {
         _setupAblyListeners();
       }
     } catch (e) {
-      // print('Google Sign-In Error: $e');
+      debugPrint('Google Sign-In Error: $e');
       rethrow;
     } finally {
       _isLoading = false;
@@ -195,7 +192,7 @@ class AuthProvider with ChangeNotifier {
     try {
       await _googleSignIn.signOut();
     } catch (e) {
-      // print('Google sign out error: $e');
+      debugPrint('Google sign out error: $e');
     }
     ablyService.disconnect();
     notifyListeners();
@@ -297,7 +294,9 @@ class AuthProvider with ChangeNotifier {
           notifyListeners();
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Failed to refresh user: $e');
+    }
   }
 
   void setGuestAddress(String address) {

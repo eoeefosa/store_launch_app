@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:store_launchfast/constants/static_data.dart';
 import 'package:provider/provider.dart';
 import 'package:store_launchfast/constants/app_colors.dart';
 import 'package:store_launchfast/providers/store_provider.dart';
-import 'package:store_launchfast/providers/auth_provider.dart';
 import 'package:store_launchfast/models/menu_item.dart';
+import 'package:store_launchfast/widgets/store/add_edit_menu_item_dialog.dart';
 
 class StoreMenuScreen extends StatefulWidget {
   const StoreMenuScreen({super.key});
@@ -47,17 +46,13 @@ class _StoreMenuScreenState extends State<StoreMenuScreen> {
     final border = isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
     final storeProvider = context.watch<StoreProvider>();
-    final auth = context.read<AuthProvider>();
-    final userId = auth.user?.id;
+    final storeId = storeProvider.ownedStoreId;
 
-    // Find store owned by the user
-    final ownedStore = storeProvider.stores.firstWhere(
-      (s) => s.ownerId == userId,
-      orElse: () => storeProvider.stores.isNotEmpty
-          ? storeProvider.stores.first
-          : StaticData.stores.first,
-    );
-    final storeId = ownedStore.id;
+    if (storeId == null) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
 
     final allItems = storeProvider.menuItems
         .where((i) => i.storeId == storeId)
@@ -84,7 +79,7 @@ class _StoreMenuScreenState extends State<StoreMenuScreen> {
           IconButton(
             icon: const Icon(Icons.add, color: Colors.white),
             onPressed: () =>
-                _showAddEditDialog(context, storeProvider, storeId, null),
+                showAddEditMenuItemDialog(context, storeProvider, storeId, null),
           ),
         ],
       ),
@@ -218,7 +213,7 @@ class _StoreMenuScreenState extends State<StoreMenuScreen> {
                       muted: muted,
                       surface: surface,
                       border: border,
-                      onEdit: () => _showAddEditDialog(
+                      onEdit: () => showAddEditMenuItemDialog(
                         context,
                         storeProvider,
                         storeId,
@@ -235,7 +230,7 @@ class _StoreMenuScreenState extends State<StoreMenuScreen> {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () =>
-            _showAddEditDialog(context, storeProvider, storeId, null),
+            showAddEditMenuItemDialog(context, storeProvider, storeId, null),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
@@ -304,328 +299,8 @@ class _StoreMenuScreenState extends State<StoreMenuScreen> {
     );
   }
 
-  // ─── Add / Edit Dialog ────────────────────────────────────────────
-  void _showAddEditDialog(
-    BuildContext context,
-    StoreProvider provider,
-    String? storeId,
-    MenuItem? item,
-  ) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isEdit = item != null;
-    final nameCtrl = TextEditingController(text: item?.name ?? '');
-    final descCtrl = TextEditingController(text: item?.description ?? '');
-    final priceCtrl = TextEditingController(
-      text: item != null ? '${item.price}' : '',
-    );
-    final imageCtrl = TextEditingController(text: item?.image ?? '');
-    String selectedCat = item?.category ?? 'Rice';
-    bool isReady = item?.isReady ?? true;
-    bool popular = item?.popular ?? false;
-
-    // Auth: get storeId from owned store (best effort)
-    // final auth = context.read<AuthProvider>();
-    final stores = provider.stores;
-    String? storeId;
-    if (stores.isNotEmpty) storeId = stores.first.id;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setModalState) => DraggableScrollableSheet(
-          initialChildSize: 0.88,
-          minChildSize: 0.5,
-          maxChildSize: 0.95,
-          builder: (_, scrollCtrl) {
-            final bg = isDark
-                ? AppColors.darkSurface
-                : AppColors.lightBackground;
-            final textColor = isDark ? AppColors.darkText : AppColors.lightText;
-            final muted = isDark ? AppColors.darkMuted : AppColors.lightMuted;
-            final border = isDark
-                ? AppColors.darkBorder
-                : AppColors.lightBorder;
-
-            return Container(
-              decoration: BoxDecoration(
-                color: bg,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-              ),
-              child: ListView(
-                controller: scrollCtrl,
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
-                children: [
-                  // drag handle
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      margin: const EdgeInsets.only(top: 8, bottom: 20),
-                      decoration: BoxDecoration(
-                        color: border,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                  ),
-
-                  Text(
-                    isEdit ? 'Edit Menu Item' : 'Add Menu Item',
-                    style: TextStyle(
-                      color: textColor,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  _buildField(
-                    'Item Name',
-                    nameCtrl,
-                    textColor,
-                    muted,
-                    border,
-                    bg,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildField(
-                    'Description',
-                    descCtrl,
-                    textColor,
-                    muted,
-                    border,
-                    bg,
-                    maxLines: 2,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildField(
-                    'Price (₦)',
-                    priceCtrl,
-                    textColor,
-                    muted,
-                    border,
-                    bg,
-                    keyboardType: TextInputType.number,
-                  ),
-                  const SizedBox(height: 14),
-                  _buildField(
-                    'Image URL',
-                    imageCtrl,
-                    textColor,
-                    muted,
-                    border,
-                    bg,
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Category
-                  Text(
-                    'Category',
-                    style: TextStyle(color: muted, fontSize: 13),
-                  ),
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    children: ['Rice', 'Swallow', 'Soup', 'Others']
-                        .map(
-                          (c) => GestureDetector(
-                            onTap: () => setModalState(() => selectedCat = c),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 200),
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 16,
-                                vertical: 8,
-                              ),
-                              decoration: BoxDecoration(
-                                color: selectedCat == c
-                                    ? AppColors.primary
-                                    : bg,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: selectedCat == c
-                                      ? AppColors.primary
-                                      : border,
-                                ),
-                              ),
-                              child: Text(
-                                c,
-                                style: TextStyle(
-                                  color: selectedCat == c
-                                      ? Colors.white
-                                      : muted,
-                                  fontWeight: selectedCat == c
-                                      ? FontWeight.w600
-                                      : FontWeight.normal,
-                                ),
-                              ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Toggles
-                  _toggleRow(
-                    'Available Now',
-                    isReady,
-                    muted,
-                    textColor,
-                    border,
-                    (v) => setModalState(() => isReady = v),
-                  ),
-                  const SizedBox(height: 8),
-                  _toggleRow(
-                    'Mark as Popular',
-                    popular,
-                    muted,
-                    textColor,
-                    border,
-                    (v) => setModalState(() => popular = v),
-                  ),
-                  const SizedBox(height: 24),
-
-                  ElevatedButton(
-                    onPressed: () async {
-                      final name = nameCtrl.text.trim();
-                      final desc = descCtrl.text.trim();
-                      final price = double.tryParse(priceCtrl.text.trim()) ?? 0;
-                      if (name.isEmpty || price <= 0) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please fill all required fields'),
-                          ),
-                        );
-                        return;
-                      }
-                      final data = {
-                        'name': name,
-                        'description': desc,
-                        'price': price,
-                        'category': selectedCat,
-                        'image': imageCtrl.text.trim().isEmpty
-                            ? 'https://placehold.co/400x300?text=$name'
-                            : imageCtrl.text.trim(),
-                        'isReady': isReady,
-                        'popular': popular,
-                        if (storeId != null && !isEdit) 'storeId': storeId,
-                      };
-                      Navigator.pop(ctx);
-                      if (isEdit) {
-                        await provider.updateMenuItem(item.id, data);
-                      } else {
-                        await provider.addMenuItem(data);
-                      }
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                              isEdit
-                                  ? 'Item updated successfully'
-                                  : 'Item added successfully',
-                            ),
-                            backgroundColor: Colors.green.shade700,
-                            behavior: SnackBarBehavior.floating,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        );
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size.fromHeight(52),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      isEdit ? 'Save Changes' : 'Add Item',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          },
-        ),
-      ),
-    );
   }
 
-  Widget _buildField(
-    String label,
-    TextEditingController ctrl,
-    Color textColor,
-    Color muted,
-    Color border,
-    Color fillColor, {
-    int maxLines = 1,
-    TextInputType keyboardType = TextInputType.text,
-  }) {
-    return TextField(
-      controller: ctrl,
-      maxLines: maxLines,
-      keyboardType: keyboardType,
-      style: TextStyle(color: textColor),
-      decoration: InputDecoration(
-        labelText: label,
-        labelStyle: TextStyle(color: muted),
-        filled: true,
-        fillColor: fillColor,
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: border),
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide(color: border),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary),
-        ),
-      ),
-    );
-  }
-
-  Widget _toggleRow(
-    String label,
-    bool value,
-    Color muted,
-    Color textColor,
-    Color border,
-    ValueChanged<bool> onChanged,
-  ) {
-    return Container(
-      decoration: BoxDecoration(
-        border: Border.all(color: border),
-        borderRadius: BorderRadius.circular(14),
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: TextStyle(color: textColor, fontSize: 14)),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: AppColors.primary,
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 // ─── Menu Item Card ───────────────────────────────────────────────────────────
 class _MenuItemCard extends StatelessWidget {

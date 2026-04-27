@@ -38,9 +38,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!(_formKey.currentState?.validate() ?? false)) return;
     await _authenticate(
       () => context.read<AuthProvider>().login(
-            _emailCtrl.text.trim(),
-            _passwordCtrl.text,
-          ),
+        _emailCtrl.text.trim(),
+        _passwordCtrl.text,
+      ),
     );
   }
 
@@ -67,12 +67,13 @@ class _LoginScreenState extends State<LoginScreen> {
       } else if (auth.user?.role == 'STORE_WORKER') {
         router.go('/worker');
       } else {
-        messenger.showSnackBar(
-          const SnackBar(
-            content: Text('Access denied: You do not have store access'),
-          ),
-        );
-        await auth.logout();
+        router.go('/store');
+        // messenger.showSnackBar(
+        //   const SnackBar(
+        //     content: Text('Access denied: You do not have store access'),
+        //   ),
+        // );
+        // await auth.logout();
       }
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text(e.toString())));

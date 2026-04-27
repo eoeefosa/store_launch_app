@@ -21,7 +21,7 @@ class _StoreMenuScreenState extends State<StoreMenuScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<StoreProvider>().refreshData();
+      if (mounted) context.read<StoreProvider>().refreshData();
     });
   }
 
@@ -46,7 +46,7 @@ class _StoreMenuScreenState extends State<StoreMenuScreen> {
     final border = isDark ? AppColors.darkBorder : AppColors.lightBorder;
 
     final storeProvider = context.watch<StoreProvider>();
-    final storeId = storeProvider.ownedStoreId;
+    final storeId = storeProvider.activeStoreId;
 
     if (storeId == null) {
       return const Scaffold(

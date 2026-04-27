@@ -49,7 +49,7 @@ class _AwaitingApprovalScreenState extends State<AwaitingApprovalScreen>
     // Auto-redirect if approved in real-time
     if (auth.isStoreApproved) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        context.go('/store');
+        if (mounted) context.go('/store');
       });
     }
 

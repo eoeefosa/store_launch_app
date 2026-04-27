@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import 'package:store_launchfast/constants/app_colors.dart';
 import 'package:store_launchfast/providers/auth_provider.dart';
 import 'package:store_launchfast/providers/store_provider.dart';
-import 'package:store_launchfast/repositories/order_repository.dart';
 import 'package:store_launchfast/models/order.dart';
 import 'package:store_launchfast/services/ably_service.dart';
 import 'package:intl/intl.dart';
@@ -51,35 +50,24 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
 
     if (storeProvider.stores.isEmpty) await storeProvider.refreshData();
 
-    final stores = storeProvider.stores;
     if (assignedStoreId != null) {
-      try {
-        final store = stores.firstWhere((s) => s.id == assignedStoreId);
-        if (mounted) {
-          setState(() {
-            _storeId = store.id;
-            _storeName = store.name;
-            _isOpen = store.isOpen;
-          });
-        }
-      } catch (_) {}
-    } else if (stores.isNotEmpty) {
-      // Fallback if adminStore not set
-      final store = stores.first;
-      if (mounted) {
-        setState(() {
-          _storeId = store.id;
-          _storeName = store.name;
-          _isOpen = store.isOpen;
-        });
-      }
+      storeProvider.setActiveStoreId(assignedStoreId);
+    }
+    
+    final store = storeProvider.activeStore;
+    if (store != null && mounted) {
+      setState(() {
+        _storeId = store.id;
+        _storeName = store.name;
+        _isOpen = store.isOpen;
+      });
     }
   }
 
   Future<void> _loadStats() async {
     try {
-      if (_storeId == null) return;
-      final stats = await orderRepository.getStoreStats(_storeId!);
+      final storeProvider = context.read<StoreProvider>();
+      final stats = await storeProvider.fetchStoreStats();
 
       if (mounted) {
         setState(() {
@@ -95,8 +83,8 @@ class _WorkerDashboardHomeState extends State<WorkerDashboardHome>
   Future<void> _loadRecentOrders() async {
     setState(() => _isLoading = true);
     try {
-      if (_storeId == null) return;
-      final orders = await orderRepository.getStoreOrders(_storeId!);
+      final storeProvider = context.read<StoreProvider>();
+      final orders = await storeProvider.fetchStoreOrders();
       orders.sort((a, b) => b.date.compareTo(a.date));
 
       if (mounted) {

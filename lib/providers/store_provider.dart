@@ -1,48 +1,104 @@
+
 import 'package:flutter/material.dart';
 import '../models/store.dart';
 import '../models/menu_item.dart';
 import '../models/order.dart';
 import '../models/store_stats.dart';
+import '../models/failure.dart';
 import '../repositories/menu_repository.dart';
 import '../repositories/store_repository.dart';
 import '../repositories/order_repository.dart';
 import '../constants/static_data.dart';
 import '../services/ably_service.dart';
 
+/// Manages the state of stores, menu items, and owned store operations.
+/// 
+/// This provider follows a strict repository-provider-UI architecture,
+/// ensuring that UI components only interact with this provider and not
+/// repositories directly.
 class StoreProvider with ChangeNotifier {
   List<Store> _stores = StaticData.stores;
   List<MenuItem> _menuItems = StaticData.menuItems;
   bool _isLoading = false;
-  String? _error;
+  Failure? _failure;
 
-  /// The userId of the current store owner/worker. Set once via [setOwner].
+  /// The userId of the current store owner.
   String? _ownerId;
 
+  /// The explicitly set active store ID (useful for workers).
+  String? _activeStoreId;
+
+  /// Cached reference to the active/owned store.
+  Store? _activeStore;
+
+  /// Returns the list of all available stores.
   List<Store> get stores => _stores;
+
+  /// Returns the list of all menu items across all stores.
   List<MenuItem> get menuItems => _menuItems;
+
+  /// Returns true if an asynchronous operation is in progress.
   bool get isLoading => _isLoading;
-  String? get error => _error;
 
-  // ─── Centralized "Owned Store" logic ─────────────────────────────
+  /// Returns the current [Failure] if an operation failed, otherwise null.
+  Failure? get failure => _failure;
 
-  /// Set the current owner's userId. Call this once after login.
+  /// Convenience getter for error message.
+  String? get error => _failure?.message;
+
+  // ─── Centralized Store Context logic ─────────────────────────────
+
+  /// Set the current owner's userId and refreshes the cached [activeStore].
   void setOwner(String userId) {
     _ownerId = userId;
+    _activeStoreId = null; // Clear explicit ID if owner is set
+    _updateStoreCache();
     notifyListeners();
   }
 
-  /// The store owned by the current user. Returns null if not found.
-  Store? get ownedStore {
-    if (_ownerId == null || _stores.isEmpty) return null;
-    try {
-      return _stores.firstWhere((s) => s.ownerId == _ownerId);
-    } catch (_) {
-      return null;
-    }
+  /// Explicitly sets the active store ID (e.g., for workers).
+  void setActiveStoreId(String storeId) {
+    _activeStoreId = storeId;
+    _ownerId = null; // Clear owner ID if explicit store is set
+    _updateStoreCache();
+    notifyListeners();
   }
 
-  /// Convenience getter for the owned store's ID.
-  String? get ownedStoreId => ownedStore?.id;
+  /// The store currently in focus (either owned by the user or assigned to them).
+  /// 
+  /// This getter provides O(1) access via a cached reference.
+  Store? get activeStore => _activeStore;
+
+  /// Alias for [activeStore] to maintain backward compatibility with previous refactor.
+  Store? get ownedStore => _activeStore;
+
+  /// Convenience getter for the active store's ID.
+  String? get activeStoreId => _activeStore?.id;
+
+  /// Alias for [activeStoreId].
+  String? get ownedStoreId => _activeStore?.id;
+
+  void _updateStoreCache() {
+    if (_activeStoreId != null) {
+      try {
+        _activeStore = _stores.firstWhere((s) => s.id == _activeStoreId);
+        return;
+      } catch (_) {
+        _activeStore = null;
+      }
+    }
+
+    if (_ownerId == null || _stores.isEmpty) {
+      _activeStore = null;
+      return;
+    }
+
+    try {
+      _activeStore = _stores.firstWhere((s) => s.ownerId == _ownerId);
+    } catch (_) {
+      _activeStore = null;
+    }
+  }
 
   // ─── Lifecycle ───────────────────────────────────────────────────
 
@@ -59,6 +115,9 @@ class StoreProvider with ChangeNotifier {
     final index = _stores.indexWhere((s) => s.id == storeId);
     if (index != -1) {
       _stores[index] = _stores[index].copyWith(isOpen: isOpen);
+      if (_stores[index].id == activeStoreId) {
+        _activeStore = _stores[index];
+      }
       notifyListeners();
     }
   }
@@ -71,18 +130,25 @@ class StoreProvider with ChangeNotifier {
 
   // ─── Data Refresh ────────────────────────────────────────────────
 
+  /// Fetches fresh store and menu data from the remote API.
+  /// 
+  /// Propagates a [Failure] if the network request fails.
   Future<void> refreshData() async {
     _isLoading = true;
-    _error = null;
+    _failure = null;
     notifyListeners();
     try {
-      final fetchedStores = await menuRepository.getStores();
-      final fetchedMenu = await menuRepository.getMenuItems();
+      final results = await Future.wait([
+        menuRepository.getStores(),
+        menuRepository.getMenuItems(),
+      ]);
 
-      if (fetchedStores.isNotEmpty) _stores = fetchedStores;
-      if (fetchedMenu.isNotEmpty) _menuItems = fetchedMenu;
+      _stores = results[0] as List<Store>;
+      _menuItems = results[1] as List<MenuItem>;
+      
+      _updateStoreCache();
     } catch (e) {
-      _error = 'Failed to fetch data from API';
+      _failure = Failure('Failed to fetch data from API', originalError: e);
       debugPrint('[StoreProvider] refreshData error: $e');
     } finally {
       _isLoading = false;
@@ -92,33 +158,59 @@ class StoreProvider with ChangeNotifier {
 
   // ─── Store Operations (wrapping StoreRepository) ─────────────────
 
-  /// Toggle the owned store's open/closed status.
+  /// Toggles the owned store's open/closed status.
   Future<void> toggleStoreStatus(bool isOpen) async {
     final id = ownedStoreId;
     if (id == null) return;
-    final updated = await storeRepository.toggleStoreStatus(id, isOpen);
-    final index = _stores.indexWhere((s) => s.id == id);
-    if (index != -1) {
-      _stores[index] = updated;
+    
+    _isLoading = true;
+    notifyListeners();
+    
+    try {
+      final updated = await storeRepository.toggleStoreStatus(id, isOpen);
+      final index = _stores.indexWhere((s) => s.id == id);
+      if (index != -1) {
+        _stores[index] = updated;
+        _activeStore = updated;
+        notifyListeners();
+      }
+    } catch (e) {
+      _failure = Failure('Failed to update store status', originalError: e);
+      rethrow;
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  /// Update the owned store's settings.
+  /// Updates the settings for the currently owned store.
   Future<void> updateStore(Map<String, dynamic> data) async {
     final id = ownedStoreId;
     if (id == null) return;
-    final updated = await storeRepository.updateStore(id, data);
-    final index = _stores.indexWhere((s) => s.id == id);
-    if (index != -1) {
-      _stores[index] = updated;
+
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      final updated = await storeRepository.updateStore(id, data);
+      final index = _stores.indexWhere((s) => s.id == id);
+      if (index != -1) {
+        _stores[index] = updated;
+        _activeStore = updated;
+        notifyListeners();
+      }
+    } catch (e) {
+      _failure = Failure('Failed to update store settings', originalError: e);
+      rethrow;
+    } finally {
+      _isLoading = false;
       notifyListeners();
     }
   }
 
   // ─── Order Operations (wrapping OrderRepository) ─────────────────
 
-  /// Fetch stats for the owned store.
+  /// Fetches real-time statistics for the owned store.
   Future<StoreStats> fetchStoreStats() async {
     final id = ownedStoreId;
     if (id == null) {
@@ -133,30 +225,34 @@ class StoreProvider with ChangeNotifier {
     return orderRepository.getStoreStats(id);
   }
 
-  /// Fetch orders for the owned store.
+  /// Fetches the list of orders belonging to the owned store.
   Future<List<Order>> fetchStoreOrders() async {
     final id = ownedStoreId;
     if (id == null) return [];
     return orderRepository.getStoreOrders(id);
   }
 
-  /// Update an order's status (via repository) and return the updated order.
+  /// Updates an order's status and returns the updated [Order] object.
   Future<Order> updateOrderStatus(String orderId, String status) {
     return orderRepository.updateOrderStatus(orderId, status);
   }
 
   // ─── Menu Operations ─────────────────────────────────────────────
 
+  /// Creates a new menu item for the owned store.
   Future<void> addMenuItem(Map<String, dynamic> data) async {
     try {
       final newItem = await menuRepository.createMenuItem(data);
       _menuItems.add(newItem);
       notifyListeners();
     } catch (e) {
+      _failure = Failure('Failed to add menu item', originalError: e);
       debugPrint('[StoreProvider] addMenuItem error: $e');
+      rethrow;
     }
   }
 
+  /// Updates an existing menu item's details.
   Future<void> updateMenuItem(String id, Map<String, dynamic> data) async {
     try {
       final updated = await menuRepository.updateMenuItem(id, data);
@@ -166,17 +262,22 @@ class StoreProvider with ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
+      _failure = Failure('Failed to update menu item', originalError: e);
       debugPrint('[StoreProvider] updateMenuItem error: $e');
+      rethrow;
     }
   }
 
+  /// Deletes a menu item from the store.
   Future<void> deleteMenuItem(String id) async {
     try {
       await menuRepository.deleteMenuItem(id);
       _menuItems.removeWhere((item) => item.id == id);
       notifyListeners();
     } catch (e) {
+      _failure = Failure('Failed to delete menu item', originalError: e);
       debugPrint('[StoreProvider] deleteMenuItem error: $e');
+      rethrow;
     }
   }
 }

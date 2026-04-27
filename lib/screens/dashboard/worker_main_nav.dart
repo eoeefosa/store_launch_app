@@ -62,24 +62,27 @@ class _WorkerMainNavState extends State<WorkerMainNav>
       end: 1.2,
     ).animate(CurvedAnimation(parent: _badgeCtrl, curve: Curves.elasticOut));
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initAbly());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initAbly();
+    });
   }
 
   Future<void> _initAbly() async {
-    if (_ablyInitialized) return;
+    if (_ablyInitialized || !mounted) return;
     final auth = context.read<AuthProvider>();
     final storeProvider = context.read<StoreProvider>();
     final userId = auth.user?.id;
-    // final adminStore = auth.user?.phone; // In this app, adminStore ID might be stored differently, let's assume UserProfile has it now.
-
-    // Note: We need adminStoreId for worker.
-    // In our backend update, we use user.adminStore.
-    // Let's ensure the frontend UserProfile has it.
+    final adminStoreId = auth.user?.adminStore;
 
     if (userId == null) return;
 
+    if (adminStoreId != null) {
+      storeProvider.setActiveStoreId(adminStoreId);
+    }
+
     try {
       await ablyService.initAbly(userId);
+      if (!mounted) return;
 
       // Listen for orders
       ablyService.addOrderListener((orderId, status) {
@@ -90,11 +93,16 @@ class _WorkerMainNavState extends State<WorkerMainNav>
       });
 
       // Find the store assigned to this worker and subscribe
-      // For now, let's assume the worker is assigned to ONE store.
-      if (storeProvider.stores.isEmpty) await storeProvider.refreshData();
+      if (storeProvider.stores.isEmpty) {
+        await storeProvider.refreshData();
+      }
+      
+      if (!mounted) return;
 
-      // We'll need a way to find which store this worker belongs to.
-      // If we don't have it in UserProfile yet, we might need to add it.
+      final activeId = storeProvider.activeStoreId;
+      if (activeId != null) {
+        ablyService.subscribeToStoreOrders(activeId);
+      }
 
       _ablyInitialized = true;
     } catch (_) {}

@@ -51,9 +51,10 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
     setState(() => _isLoading = true);
     try {
       final storeProvider = context.read<StoreProvider>();
-      final store = storeProvider.ownedStore;
+      final store = storeProvider.activeStore;
       if (store == null) return;
 
+      if (!mounted) return;
       _storeId = store.id;
       _nameCtrl.text = store.name;
       _taglineCtrl.text = store.tagline;
@@ -78,10 +79,10 @@ class _StoreSettingsScreenState extends State<StoreSettingsScreen> {
         'deliveryTime': _deliveryTimeCtrl.text.trim(),
         'deliveryFee': double.tryParse(_deliveryFeeCtrl.text.trim()) ?? 0,
       });
-      _showSnackBar('Store updated successfully', success: true);
+      if (mounted) _showSnackBar('Store updated successfully', success: true);
     } catch (e) {
       debugPrint('[StoreSettings] _saveStore error: $e');
-      _showSnackBar('Failed to save store settings', success: false);
+      if (mounted) _showSnackBar('Failed to save store settings', success: false);
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }

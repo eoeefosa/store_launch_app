@@ -74,11 +74,13 @@ class _StoreMainNavState extends State<StoreMainNav>
       StoreSettingsScreen(),
     ];
 
-    WidgetsBinding.instance.addPostFrameCallback((_) => _initAbly());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _initAbly();
+    });
   }
 
   Future<void> _initAbly() async {
-    if (_ablyInitialized) return;
+    if (_ablyInitialized || !mounted) return;
     final auth = context.read<AuthProvider>();
     final storeProvider = context.read<StoreProvider>();
     final userId = auth.user?.id;
@@ -89,12 +91,18 @@ class _StoreMainNavState extends State<StoreMainNav>
 
     try {
       await ablyService.initAbly(userId);
+      if (!mounted) return;
 
       // Listen for new orders via the order-update listener
       ablyService.addOrderListener(_onAblyOrderUpdate);
 
       // Subscribe to the owned store's orders channel
-      if (storeProvider.stores.isEmpty) await storeProvider.refreshData();
+      if (storeProvider.stores.isEmpty) {
+        await storeProvider.refreshData();
+      }
+      
+      if (!mounted) return;
+      
       final ownedId = storeProvider.ownedStoreId;
       if (ownedId != null) {
         ablyService.subscribeToStoreOrders(ownedId);

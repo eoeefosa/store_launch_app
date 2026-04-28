@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'menu_item.dart';
 
 class CartItem {

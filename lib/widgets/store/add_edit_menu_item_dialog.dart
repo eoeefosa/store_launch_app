@@ -229,7 +229,7 @@ class _AddEditMenuItemDialogState extends State<AddEditMenuItemDialog> {
                           : Image.network(
                               _selectedImageStr!,
                               fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => const Center(
+                              errorBuilder: (_, _, _) => const Center(
                                 child: Icon(Icons.error_outline, color: Colors.red),
                               ),
                             )

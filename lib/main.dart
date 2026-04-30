@@ -10,8 +10,11 @@ import 'providers/cart_provider.dart';
 import 'providers/order_provider.dart';
 import 'providers/notification_provider.dart';
 import 'providers/staff_provider.dart';
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await notificationService.init();
   runApp(
     MultiProvider(
       providers: [

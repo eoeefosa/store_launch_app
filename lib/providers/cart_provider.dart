@@ -223,9 +223,13 @@ class CartProvider with ChangeNotifier {
   double get deliveryFees {
     if (_items.isEmpty) return 0;
     final storeIds = _items.map((i) => i.menuItem.storeId).toSet();
-    return storeIds.fold(0, (sum, id) {
-      final store = StaticData.stores.firstWhere((s) => s.id == id);
-      return sum + store.deliveryFee;
+    return storeIds.fold(0.0, (sum, id) {
+      try {
+        final store = StaticData.stores.firstWhere((s) => s.id == id);
+        return sum + store.deliveryFee;
+      } catch (_) {
+        return sum;
+      }
     });
   }
 

@@ -109,12 +109,16 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
     );
     if (_hasSalad) total += StaticData.saladPrice;
     if (_selectedSoupId != null) {
-      final soup = availableSoups.firstWhere((s) => s.id == _selectedSoupId);
-      if (!soup.isFreeWithSwallow) total += soup.price;
+      try {
+        final soup = availableSoups.firstWhere((s) => s.id == _selectedSoupId);
+        if (!soup.isFreeWithSwallow) total += soup.price;
+      } catch (_) {}
     }
     _selectedAddons.forEach((id, count) {
-      final addon = availableAddons.firstWhere((m) => m.id == id);
-      total += addon.price * count;
+      try {
+        final addon = availableAddons.firstWhere((m) => m.id == id);
+        total += addon.price * count;
+      } catch (_) {}
     });
     return total * _quantity;
   }
@@ -126,8 +130,20 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
 
-    final item = storeProvider.menuItems.firstWhere((m) => m.id == widget.id);
-    final store = StaticData.stores.firstWhere((s) => s.id == item.storeId);
+    MenuItem? item;
+    try {
+      item = storeProvider.menuItems.firstWhere((m) => m.id == widget.id);
+    } catch (_) {
+      return const Scaffold(body: Center(child: Text('Item not found')));
+    }
+
+    Store? store;
+    try {
+      store = StaticData.stores.firstWhere((s) => s.id == item.storeId);
+    } catch (_) {
+      // Fallback or error
+      return const Scaffold(body: Center(child: Text('Store not found')));
+    }
     final accentColor = store.color;
 
     final availableSoups = item.category == 'Swallow'
@@ -139,8 +155,15 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
     final availableAddons = item.addonIds != null
         ? item.addonIds!
               .map(
-                (id) => storeProvider.menuItems.firstWhere((m) => m.id == id),
+                (id) {
+                  try {
+                    return storeProvider.menuItems.firstWhere((m) => m.id == id);
+                  } catch (_) {
+                    return null;
+                  }
+                },
               )
+              .whereType<MenuItem>()
               .toList()
         : <MenuItem>[];
 
@@ -246,10 +269,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen>
     StoreProvider storeProvider,
   ) {
     if (_selectedSoupId == null) return;
-    final soup = storeProvider.menuItems.firstWhere(
-      (m) => m.id == _selectedSoupId,
-    );
-    cartProvider.addToCart(item: soup, quantity: _quantity);
+    try {
+      final soup = storeProvider.menuItems.firstWhere(
+        (m) => m.id == _selectedSoupId,
+      );
+      cartProvider.addToCart(item: soup, quantity: _quantity);
+    } catch (_) {
+      // Could not find soup
+    }
   }
 
   void _showSnack(BuildContext context, String message) {

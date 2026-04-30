@@ -129,6 +129,7 @@ class _WorkerMainNavState extends State<WorkerMainNav>
       const WorkerDashboardHome(),
       const StoreOrdersScreen(),
       const StoreMenuScreen(),
+      const Center(child: Text('Profile Settings (Coming Soon)')),
     ];
 
     return Scaffold(

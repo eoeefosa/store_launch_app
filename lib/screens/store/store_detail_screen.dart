@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:store_launchfast/models/store.dart';
 import '../../providers/store_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../models/menu_item.dart';
@@ -16,7 +17,12 @@ class StoreDetailScreen extends StatelessWidget {
     final storeProvider = context.watch<StoreProvider>();
     final cartProvider = context.read<CartProvider>();
 
-    final store = storeProvider.stores.firstWhere((s) => s.id == id);
+    Store? store;
+    try {
+      store = storeProvider.stores.firstWhere((s) => s.id == id);
+    } catch (_) {
+      return const Scaffold(body: Center(child: Text('Store not found')));
+    }
     final items = storeProvider.menuItems
         .where((m) => m.storeId == id)
         .toList();

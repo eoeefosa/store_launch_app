@@ -31,9 +31,14 @@ class AuthProvider with ChangeNotifier {
   bool get isPendingApproval => isStoreOwner && !isStoreApproved;
   bool get isRider => _user?.role == 'rider';
   bool get isAuthenticated => _token != null;
-  Store? get adminStore => _adminStoreId != null
-      ? StaticData.stores.firstWhere((s) => s.id == _adminStoreId)
-      : null;
+  Store? get adminStore {
+    if (_adminStoreId == null) return null;
+    try {
+      return StaticData.stores.firstWhere((s) => s.id == _adminStoreId);
+    } catch (_) {
+      return null;
+    }
+  }
 
   final GoogleSignIn _googleSignIn = GoogleSignIn(
     clientId: Platform.isIOS

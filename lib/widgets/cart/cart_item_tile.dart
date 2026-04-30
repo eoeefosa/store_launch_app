@@ -24,8 +24,10 @@ class CartItemTile extends StatelessWidget {
     if (item.hasSalad) total += StaticData.saladPrice;
 
     item.selectedAddons?.forEach((id, count) {
-      final addon = StaticData.menuItems.firstWhere((m) => m.id == id);
-      total += addon.price * count;
+      try {
+        final addon = StaticData.menuItems.firstWhere((m) => m.id == id);
+        total += addon.price * count;
+      } catch (_) {}
     });
 
     return total;

@@ -3,6 +3,7 @@ import 'package:ably_flutter/ably_flutter.dart' as ably;
 import 'package:flutter/foundation.dart';
 import 'api_service.dart';
 import '../models/order.dart';
+import 'notification_service.dart';
 
 class AblyService {
   static final AblyService _instance = AblyService._internal();
@@ -73,6 +74,13 @@ class AblyService {
         // print('Ably connection state: ${stateChange.current}');
         if (stateChange.current == ably.ConnectionState.connected) {
           _subscribeChannel(userId);
+          
+          // Attempt to activate Ably push for the device
+          try {
+            _realtime!.push.activate();
+          } catch (e) {
+            debugPrint('Error activating Ably Push: $e');
+          }
         }
       });
     } finally {
@@ -95,6 +103,12 @@ class AblyService {
           final orderId = data['orderId'] as String;
           final statusStr = data['status'] as String;
           final status = OrderStatusExtension.fromString(statusStr);
+          
+          notificationService.showNotification(
+            title: 'Order Update',
+            body: 'Your order is now $statusStr',
+          );
+          
           for (final cb in _orderListeners) {
             cb(orderId, status);
           }
@@ -109,6 +123,12 @@ class AblyService {
       try {
         final data = message.data as Map;
         final newRole = data['newRole'] as String;
+        
+        notificationService.showNotification(
+          title: 'Role Updated',
+          body: 'Your account role has been updated to $newRole.',
+        );
+        
         for (final cb in _roleListeners) {
           cb(newRole);
         }
@@ -122,6 +142,12 @@ class AblyService {
       try {
         final data = message.data as Map;
         final storeId = data['storeId'] as String;
+        
+        notificationService.showNotification(
+          title: 'Store Approved',
+          body: 'Your store has been approved and is now active!',
+        );
+        
         for (final cb in _approvalListeners) {
           cb(storeId);
         }
@@ -180,6 +206,10 @@ class AblyService {
       message,
     ) {
       if (onOrderUpdate != null) {
+        notificationService.showNotification(
+          title: 'Delivery Update',
+          body: 'An update is available for your assigned delivery.',
+        );
         onOrderUpdate(message.data as Map);
       }
     });
@@ -191,6 +221,10 @@ class AblyService {
       message,
     ) {
       if (onNewJob != null) {
+        notificationService.showNotification(
+          title: 'New Delivery Available',
+          body: 'A new delivery job is available near you.',
+        );
         onNewJob(message.data as Map);
       }
     });
@@ -207,6 +241,12 @@ class AblyService {
       try {
         final data = message.data as Map;
         final orderId = data['id'] as String;
+        
+        notificationService.showNotification(
+          title: 'New Order',
+          body: 'You have received a new order!',
+        );
+        
         // Notify order listeners
         for (final cb in _orderListeners) {
           cb(orderId, OrderStatus.pending);
@@ -223,6 +263,11 @@ class AblyService {
         final orderId = data['orderId'] as String;
         final statusStr = data['status'] as String;
         final status = OrderStatusExtension.fromString(statusStr);
+
+        notificationService.showNotification(
+          title: 'Order Status Changed',
+          body: 'Order status changed to $statusStr',
+        );
 
         // Notify order listeners
         for (final cb in _orderListeners) {

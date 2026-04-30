@@ -239,7 +239,7 @@ class StoreDetailScreen extends StatelessWidget {
                             cartProvider,
                             item,
                             accentColor,
-                            store.isOpen,
+                            store!.isOpen,
                           ),
                         ),
                         const SizedBox(height: 20),

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:store_launchfast/router.dart';
 import 'package:provider/provider.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 
 import 'constants/app_colors.dart';
 import 'providers/auth_provider.dart';
@@ -12,9 +14,26 @@ import 'providers/notification_provider.dart';
 import 'providers/staff_provider.dart';
 import 'services/notification_service.dart';
 
+import 'locator.dart';
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  debugPrint('🚀 Initializing Firebase...');
+  try {
+    await Firebase.initializeApp(
+      options: DefaultFirebaseOptions.currentPlatform,
+    );
+    debugPrint('✅ Firebase initialized');
+  } catch (e) {
+    debugPrint('❌ Firebase initialization failed: $e');
+  }
+
+  setupLocator();
+  debugPrint('✅ Locator setup');
+  
   await notificationService.init();
+  debugPrint('✅ Notifications initialized');
   runApp(
     MultiProvider(
       providers: [

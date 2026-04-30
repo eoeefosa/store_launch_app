@@ -10,6 +10,7 @@ import 'package:store_launchfast/screens/dashboard/main_dashboard.dart';
 import 'package:store_launchfast/screens/dashboard/order_screen.dart';
 import 'package:store_launchfast/screens/dashboard/menu_screen.dart';
 import 'package:store_launchfast/screens/dashboard/store_setting.dart';
+import '../../locator.dart';
 
 class StoreMainNav extends StatefulWidget {
   const StoreMainNav({super.key});
@@ -90,11 +91,11 @@ class _StoreMainNavState extends State<StoreMainNav>
     storeProvider.setOwner(userId);
 
     try {
-      await ablyService.initAbly(userId);
+      await locator<AblyService>().initAbly(userId);
       if (!mounted) return;
 
       // Listen for new orders via the order-update listener
-      ablyService.addOrderListener(_onAblyOrderUpdate);
+      locator<AblyService>().addOrderListener(_onAblyOrderUpdate);
 
       // Subscribe to the owned store's orders channel
       if (storeProvider.stores.isEmpty) {
@@ -105,7 +106,7 @@ class _StoreMainNavState extends State<StoreMainNav>
       
       final ownedId = storeProvider.ownedStoreId;
       if (ownedId != null) {
-        ablyService.subscribeToStoreOrders(ownedId);
+        locator<AblyService>().subscribeToStoreOrders(ownedId);
       }
 
       _ablyInitialized = true;
@@ -132,7 +133,7 @@ class _StoreMainNavState extends State<StoreMainNav>
   void dispose() {
     _badgeCtrl.dispose();
     if (_ablyInitialized) {
-      ablyService.removeOrderListener(_onAblyOrderUpdate);
+      locator<AblyService>().removeOrderListener(_onAblyOrderUpdate);
     }
     super.dispose();
   }

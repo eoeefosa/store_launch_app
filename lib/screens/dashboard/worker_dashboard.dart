@@ -5,8 +5,8 @@ import 'package:store_launchfast/constants/app_colors.dart';
 import 'package:store_launchfast/providers/auth_provider.dart';
 import 'package:store_launchfast/providers/store_provider.dart';
 import 'package:store_launchfast/models/order.dart';
-import 'package:store_launchfast/services/ably_service.dart';
 import 'package:intl/intl.dart';
+import '../../locator.dart';
 
 class WorkerDashboardHome extends StatefulWidget {
   const WorkerDashboardHome({super.key});

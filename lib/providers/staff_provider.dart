@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/staff_member.dart';
 import '../repositories/store_repository.dart';
+import '../locator.dart';
 
 class StaffProvider with ChangeNotifier {
   List<StaffMember> _staff = [];
@@ -17,7 +18,7 @@ class StaffProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      _staff = await storeRepository.getStaff(storeId);
+      _staff = await locator<StoreRepository>().getStaff(storeId);
     } catch (e) {
       _error = 'Failed to load staff';
     } finally {
@@ -32,7 +33,7 @@ class StaffProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final newStaff = await storeRepository.addStaff(storeId, email);
+      final newStaff = await locator<StoreRepository>().addStaff(storeId, email);
       _staff.add(newStaff);
     } catch (e) {
       _error = 'Failed to add staff. Ensure the user exists.';
@@ -45,7 +46,7 @@ class StaffProvider with ChangeNotifier {
 
   Future<void> removeStaff(String storeId, String workerId) async {
     try {
-      await storeRepository.removeStaff(storeId, workerId);
+      await locator<StoreRepository>().removeStaff(storeId, workerId);
       _staff.removeWhere((s) => s.id == workerId);
       notifyListeners();
     } catch (e) {

@@ -38,5 +38,3 @@ class AuthRepository {
     return response.data;
   }
 }
-
-final authRepository = AuthRepository();

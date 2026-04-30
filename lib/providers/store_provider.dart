@@ -10,6 +10,7 @@ import '../repositories/store_repository.dart';
 import '../repositories/order_repository.dart';
 import '../constants/static_data.dart';
 import '../services/ably_service.dart';
+import '../locator.dart';
 
 /// Manages the state of stores, menu items, and owned store operations.
 /// 
@@ -108,7 +109,7 @@ class StoreProvider with ChangeNotifier {
   }
 
   void _initStoreListener() {
-    ablyService.addStoreListener(_onStoreUpdate);
+    locator<AblyService>().addStoreListener(_onStoreUpdate);
   }
 
   void _onStoreUpdate(String storeId, bool isOpen) {
@@ -124,7 +125,7 @@ class StoreProvider with ChangeNotifier {
 
   @override
   void dispose() {
-    ablyService.removeStoreListener(_onStoreUpdate);
+    locator<AblyService>().removeStoreListener(_onStoreUpdate);
     super.dispose();
   }
 
@@ -139,8 +140,8 @@ class StoreProvider with ChangeNotifier {
     notifyListeners();
     try {
       final results = await Future.wait([
-        menuRepository.getStores(),
-        menuRepository.getMenuItems(),
+        locator<MenuRepository>().getStores(),
+        locator<MenuRepository>().getMenuItems(),
       ]);
 
       _stores = results[0] as List<Store>;
@@ -167,7 +168,7 @@ class StoreProvider with ChangeNotifier {
     notifyListeners();
     
     try {
-      final updated = await storeRepository.toggleStoreStatus(id, isOpen);
+      final updated = await locator<StoreRepository>().toggleStoreStatus(id, isOpen);
       final index = _stores.indexWhere((s) => s.id == id);
       if (index != -1) {
         _stores[index] = updated;
@@ -192,7 +193,7 @@ class StoreProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final updated = await storeRepository.updateStore(id, data);
+      final updated = await locator<StoreRepository>().updateStore(id, data);
       final index = _stores.indexWhere((s) => s.id == id);
       if (index != -1) {
         _stores[index] = updated;
@@ -222,19 +223,19 @@ class StoreProvider with ChangeNotifier {
         topSellingItems: {},
       );
     }
-    return orderRepository.getStoreStats(id);
+    return locator<OrderRepository>().getStoreStats(id);
   }
 
   /// Fetches the list of orders belonging to the owned store.
   Future<List<Order>> fetchStoreOrders() async {
     final id = ownedStoreId;
     if (id == null) return [];
-    return orderRepository.getStoreOrders(id);
+    return locator<OrderRepository>().getStoreOrders(id);
   }
 
   /// Updates an order's status and returns the updated [Order] object.
   Future<Order> updateOrderStatus(String orderId, String status) {
-    return orderRepository.updateOrderStatus(orderId, status);
+    return locator<OrderRepository>().updateOrderStatus(orderId, status);
   }
 
   // ─── Menu Operations ─────────────────────────────────────────────
@@ -242,7 +243,7 @@ class StoreProvider with ChangeNotifier {
   /// Creates a new menu item for the owned store.
   Future<void> addMenuItem(Map<String, dynamic> data) async {
     try {
-      final newItem = await menuRepository.createMenuItem(data);
+      final newItem = await locator<MenuRepository>().createMenuItem(data);
       _menuItems.add(newItem);
       notifyListeners();
     } catch (e) {
@@ -255,7 +256,7 @@ class StoreProvider with ChangeNotifier {
   /// Updates an existing menu item's details.
   Future<void> updateMenuItem(String id, Map<String, dynamic> data) async {
     try {
-      final updated = await menuRepository.updateMenuItem(id, data);
+      final updated = await locator<MenuRepository>().updateMenuItem(id, data);
       final index = _menuItems.indexWhere((item) => item.id == id);
       if (index != -1) {
         _menuItems[index] = updated;
@@ -271,7 +272,7 @@ class StoreProvider with ChangeNotifier {
   /// Deletes a menu item from the store.
   Future<void> deleteMenuItem(String id) async {
     try {
-      await menuRepository.deleteMenuItem(id);
+      await locator<MenuRepository>().deleteMenuItem(id);
       _menuItems.removeWhere((item) => item.id == id);
       notifyListeners();
     } catch (e) {

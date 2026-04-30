@@ -54,5 +54,3 @@ class StoreRepository {
     await apiService.dio.delete('/stores/$storeId/staff/$workerId');
   }
 }
-
-final storeRepository = StoreRepository();

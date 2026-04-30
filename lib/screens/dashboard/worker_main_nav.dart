@@ -4,11 +4,11 @@ import 'package:provider/provider.dart';
 import 'package:store_launchfast/constants/app_colors.dart';
 import 'package:store_launchfast/providers/auth_provider.dart';
 import 'package:store_launchfast/providers/store_provider.dart';
-import 'package:store_launchfast/services/ably_service.dart';
 import 'package:store_launchfast/models/order.dart';
 import 'package:store_launchfast/screens/dashboard/worker_dashboard.dart';
 import 'package:store_launchfast/screens/dashboard/order_screen.dart';
 import 'package:store_launchfast/screens/dashboard/menu_screen.dart';
+import '../../locator.dart';
 
 class WorkerMainNav extends StatefulWidget {
   const WorkerMainNav({super.key});

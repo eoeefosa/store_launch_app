@@ -11,6 +11,7 @@ import 'package:store_launchfast/widgets/dashboard/status_card.dart';
 import 'package:store_launchfast/widgets/dashboard/stats_grid.dart';
 import 'package:store_launchfast/widgets/dashboard/top_selling_items.dart';
 import 'package:store_launchfast/widgets/dashboard/recent_orders_list.dart';
+import '../../locator.dart';
 
 class StoreDashboardHome extends StatefulWidget {
   const StoreDashboardHome({super.key});
@@ -132,7 +133,7 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
   }
 
   void _subscribeAbly() {
-    ablyService.addStoreListener(_onStoreToggle);
+    locator<AblyService>().addStoreListener(_onStoreToggle);
   }
 
   Future<void> _onStoreToggle(String storeId, bool isOpen) async {
@@ -184,7 +185,7 @@ class _StoreDashboardHomeState extends State<StoreDashboardHome>
   @override
   void dispose() {
     _pulseCtrl.dispose();
-    ablyService.removeStoreListener(_onStoreToggle);
+    locator<AblyService>().removeStoreListener(_onStoreToggle);
     _audioPlayer.dispose();
     super.dispose();
   }

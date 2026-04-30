@@ -15,9 +15,7 @@ import 'notification_service.dart';
 /// - Uses [debugPrint] instead of bare [print] for release builds.
 /// - Prevents duplicate listeners using [_activeSubscriptionKeys].
 class AblyService {
-  static final AblyService _instance = AblyService._internal();
-  factory AblyService() => _instance;
-  AblyService._internal();
+  AblyService();
 
   ably.Realtime? _realtime;
   bool _isConnecting = false;
@@ -365,5 +363,3 @@ class AblyService {
     _activeSubscriptionKeys.clear();
   }
 }
-
-final ablyService = AblyService();

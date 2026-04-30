@@ -9,6 +9,7 @@ import '../services/api_service.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import '../services/ably_service.dart';
 import 'dart:io';
+import '../locator.dart';
 
 class AuthProvider with ChangeNotifier {
   final storage = const FlutterSecureStorage();
@@ -81,7 +82,7 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final data = await authRepository.login(email, password);
+      final data = await locator<AuthRepository>().login(email, password);
       final userData = data['user'] ?? data;
       if (userData is Map && userData['id'] != null) {
         _user = UserProfile.fromJson(userData as Map<String, dynamic>);
@@ -104,7 +105,7 @@ class AuthProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
     try {
-      final data = await authRepository.register(userData);
+      final data = await locator<AuthRepository>().register(userData);
       final uData = data['user'] ?? data;
       if (uData is Map && uData['id'] != null) {
         _user = UserProfile.fromJson(uData as Map<String, dynamic>);
@@ -128,7 +129,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
     try {
       print(applyData);
-      final data = await authRepository.applyForStore(applyData);
+      final data = await locator<AuthRepository>().applyForStore(applyData);
       final uData = data['user'] ?? data;
       if (uData is Map && uData['id'] != null) {
         _user = UserProfile.fromJson(uData as Map<String, dynamic>);
@@ -166,7 +167,7 @@ class AuthProvider with ChangeNotifier {
         throw Exception('No ID token returned from Google');
       }
 
-      final data = await authRepository.loginWithGoogle(idToken);
+      final data = await locator<AuthRepository>().loginWithGoogle(idToken);
       final uData = data['user'] ?? data;
       if (uData is Map && uData['id'] != null) {
         _user = UserProfile.fromJson(uData as Map<String, dynamic>);
@@ -199,7 +200,7 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Google sign out error: $e');
     }
-    ablyService.disconnect();
+    locator<AblyService>().disconnect();
     notifyListeners();
   }
 
@@ -215,7 +216,7 @@ class AuthProvider with ChangeNotifier {
     }
 
     try {
-      final data = await authRepository.updateProfile(updates);
+      final data = await locator<AuthRepository>().updateProfile(updates);
       final uData = data['user'] ?? data;
       if (uData is Map && uData['id'] != null) {
         _user = UserProfile.fromJson(uData as Map<String, dynamic>);
@@ -264,11 +265,11 @@ class AuthProvider with ChangeNotifier {
     if (_user == null) return;
     
     // Ensure Ably is initialized for this user
-    ablyService.initAbly(_user!.id);
+    locator<AblyService>().initAbly(_user!.id);
     
-    // Add listeners (they won't be duplicated if already added in ablyService)
-    ablyService.addRoleListener(updateRole);
-    ablyService.addStoreApprovalListener((storeId) {
+    // Add listeners (they won't be duplicated if already added in locator<AblyService>())
+    locator<AblyService>().addRoleListener(updateRole);
+    locator<AblyService>().addStoreApprovalListener((storeId) {
       updateStoreApproval(true);
     });
   }
@@ -323,7 +324,7 @@ class AuthProvider with ChangeNotifier {
     updateUser({'isOnline': isOnline});
     
     try {
-      await authRepository.updateProfile({'isOnline': isOnline});
+      await locator<AuthRepository>().updateProfile({'isOnline': isOnline});
     } catch (e) {
       // Revert if API fails
       updateUser({'isOnline': oldStatus});

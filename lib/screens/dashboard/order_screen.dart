@@ -4,8 +4,8 @@ import 'package:provider/provider.dart';
 import 'package:store_launchfast/constants/app_colors.dart';
 import 'package:store_launchfast/models/order.dart';
 import 'package:store_launchfast/providers/store_provider.dart';
-import 'package:store_launchfast/services/ably_service.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../locator.dart';
 
 class StoreOrdersScreen extends StatefulWidget {
   const StoreOrdersScreen({super.key});
